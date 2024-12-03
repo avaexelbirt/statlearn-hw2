@@ -358,4 +358,12 @@ ggplot(training, aes(x = success)) +
 # Classification with Emphasis on Prediction
 
 
+```{r}
+print("testing")
+```
+
+# please
+```{r}
+print("this better show up")
+```
 
