@@ -10,8 +10,17 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r libraries}
+# Install necessary libraries if not installed
+install.packages(c("ggplot2", "dplyr", "scales", "lubridate"))
+
+# Load libraries
+library(ggplot2)
+library(dplyr)
+library(scales)
+library(lubridate)
 library(tidyverse)
 library(GGally)
+library(caret)
 ```
 
 # About the Data
@@ -24,7 +33,7 @@ tuesdata <- tidytuesdayR::tt_load(2022, week = 44)
 horror <- tuesdata$horror_movies
 ```
 
-```{r}
+```{r glimpse}
 glimpse(horror)
 ```
 
@@ -65,26 +74,25 @@ The motivation behind this project is to explore and predict whether a piece of 
 
 ### Goal
 
-The primary goal of this project is to develop a classification model that accurately predicts whether a given piece of entertainment is a movie or a TV show. The project will focus on both prediction and interpretation, with a particular emphasis on selecting relevant features and comparing predictor sets. By using a variety of features, we aim to enhance the model\'s performance and interpretability, ultimately offering a deeper understanding of the factors that contribute to the classification process. This will allow us to make data-driven recommendations for content categorization. Using a set of features extracted from historical data on various entertainment pieces, we aim to classify each entry correctly. By identifying patterns in the data, we can predict whether new content belongs to a TV show or movie, improving content recommendation systems and user engagement strategies.
+The primary goal of this project is to develop a classification model that accurately predicts whether a given piece of entertainment is a movie or a TV show. The project will focus on both prediction and interpretation, with a particular emphasis on selecting relevant features and comparing predictor sets. By using a variety of features, we aim to enhance the model's performance and interpretability, ultimately offering a deeper understanding of the factors that contribute to the classification process. This will allow us to make data-driven recommendations for content categorization. Using a set of features extracted from historical data on various entertainment pieces, we aim to classify each entry correctly. By identifying patterns in the data, we can predict whether new content belongs to a TV show or movie, improving content recommendation systems and user engagement strategies.
 
-# Data Preprocessing and Visualization Tools 
+# Data Preprocessing and Visualization Tools
 
-```{r}
+```{r summ}
 summary(horror)
 ```
 
-## Data Cleanup 
+## Data Cleanup
 
 ### Handling NA Values
 
-```{r}
-# Count the number of NA values in each column
+We will look at how many NA values are in each column to better understand our data set.
+
+```{r NA-count}
 na_counts <- colSums(is.na(horror))
 
-# Display the NA counts
 print(na_counts)
 
-# Optional: View the NA counts in a more readable format
 na_counts_df <- data.frame(Column = names(na_counts), NA_Count = na_counts)
 print(na_counts_df)
 
@@ -154,3 +162,171 @@ horror$budget_category <- ifelse(horror$budget == 0, "No Budget",
 ```{r corr}
 ggcorr(horror[ , sapply(horror, is.numeric)], label = TRUE)
 ```
+
+## Visualization Tools
+
+### Distribution of Numeric Features
+
+We will plot the distributions of numeric features, specifically budget, revenue, and runtime.
+
+```{r num-dist}
+ggplot(horror, aes(x = budget)) +
+  geom_histogram(binwidth = 1e7, fill = "blue", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Budget", x = "Budget", y = "Count") +
+  theme_minimal()
+
+ggplot(horror, aes(x = revenue)) +
+  geom_histogram(binwidth = 1e7, fill = "green", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Revenue", x = "Revenue", y = "Count") +
+  theme_minimal()
+
+ggplot(horror, aes(x = runtime)) +
+  geom_histogram(binwidth = 10, fill = "red", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Runtime", x = "Runtime (Minutes)", y = "Count") +
+  theme_minimal()
+```
+
+Budget and revenue are both right skewed and unimodal. Runtime is also right skewed, but bimodal.
+
+### Distribution of Some Categorical Features
+
+We will plot the distributions of some categorical features, specifically release_year and budget_category.
+
+```{r cat-dist}
+ggplot(horror, aes(x = release_year)) +
+  geom_bar(fill = "purple", color = "black") +
+  labs(title = "Distribution of Movies by Release Year", x = "Release Year", y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(horror, aes(x = budget_category, fill = budget_category)) +
+  geom_bar() +
+  labs(title = "Distribution of Movies by Budget Category", x = "Budget Category", y = "Count") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+```
+
+Release year is left skewed and unimodal.
+
+### Distribution of Target Variable
+
+We will now look at the distribution of our target variable, show_or_movie.
+
+###CHANGE WITH NEW PREDICTOR
+
+```{r horrordist}
+ggplot(horror, aes(x = show_or_movie)) + 
+  geom_bar(fill = "lightblue", color = "black") + 
+  labs(title = "Distribution of Show or Movie", x = "Show or Movie", y = "Count") + 
+  theme_minimal()
+```
+
+### Variable Relationships
+
+We first examine the relationship between budget and revenue for each horror movie, with points colored by their budget category, helping to identify patterns and outliers in how budget impacts revenue. We can also visualize how the budget has evolved over the years by plotting release_year versus budget. We finally examine the relationship between `popularity` and `vote_average` to see if there's a trend in how movies' popularity correlates with their ratings.
+
+```{r}
+ggplot(horror, aes(x = budget, y = revenue)) +
+  geom_point(aes(color = budget_category), alpha = 0.7) +
+  scale_x_continuous(labels = scales::comma) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title = "Budget vs Revenue", x = "Budget", y = "Revenue") +
+  theme_minimal() +
+  theme(legend.title = element_blank())
+
+ggplot(horror, aes(x = release_year, y = budget)) +
+  geom_point(aes(color = budget_category), alpha = 0.7) +
+  scale_x_continuous(labels = scales::comma) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title = "Release Year vs")
+
+
+ggplot(horror, aes(x = popularity, y = vote_average)) +
+  geom_point(aes(color = genre_names), alpha = 0.7) +
+  scale_x_continuous(labels = scales::comma) +
+  labs(title = "Popularity vs Vote Average", x = "Popularity", y = "Vote Average") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+
+```
+
+## Split the Data
+
+### Train and Test Data
+
+We will split the data into training (60%) and testing (40%) sets. We will then look at the new data by checking the number of rows in training and testing sets and looking at the summary of the training set.
+
+```{r split}
+set.seed(123)
+
+in_train <- createDataPartition(horror$budget_category, p = 0.6, list = FALSE)
+training <- horror[in_train, ]
+testing <- horror[-in_train, ]
+
+nrow(training)
+nrow(testing)
+
+summary(training)
+```
+
+#CHANGE WITH NEW VARIABLE
+
+### Distribution of Target Variable
+
+```{r show-dist}
+table(training$show_or_movie) / length(training$show_or_movie)
+
+```
+
+### Training Visuals
+
+```{r}
+# Visualizing the distribution of 'budget' in training data
+ggplot(training, aes(x = budget)) + 
+  geom_density(fill = "lightblue") + 
+  labs(title = "Density of Budget", x = "Budget", y = "Density")
+
+# Visualizing the distribution of 'revenue' in training data
+ggplot(training, aes(x = revenue)) + 
+  geom_density(fill = "lightgreen") + 
+  labs(title = "Density of Revenue", x = "Revenue", y = "Density")
+
+# Visualizing 'budget' against 'revenue'
+ggplot(training, aes(x = budget, y = revenue)) + 
+  geom_point(aes(color = budget_category), alpha = 0.7) + 
+  scale_x_continuous(labels = scales::comma) + 
+  scale_y_continuous(labels = scales::comma) + 
+  labs(title = "Budget vs Revenue", x = "Budget", y = "Revenue") + 
+  theme_minimal() + 
+  theme(legend.title = element_blank())
+
+# Exploring 'runtime' distribution
+ggplot(training, aes(x = runtime)) + 
+  geom_density(fill = "lightcoral") + 
+  labs(title = "Density of Runtime", x = "Runtime", y = "Density")
+
+# Exploring 'popularity' distribution
+ggplot(training, aes(x = popularity)) + 
+  geom_density(fill = "lightyellow") + 
+  labs(title = "Density of Popularity", x = "Popularity", y = "Density")
+
+# Decomposing runtime by 'budget_category'
+ggplot(training, aes(x = runtime, fill = budget_category)) + 
+  geom_density(alpha = 0.5) + 
+  labs(title = "Runtime by Budget Category", x = "Runtime", y = "Density")
+
+# Visualizing 'vote_average' distribution
+ggplot(training, aes(x = vote_average)) + 
+  geom_density(fill = "lightblue") + 
+  labs(title = "Density of Vote Average", x = "Vote Average", y = "Density")
+
+# Visualizing 'release_year' distribution
+ggplot(training, aes(x = release_year)) + 
+  geom_bar(fill = "lightgreen") + 
+  labs(title = "Release Year Distribution", x = "Release Year", y = "Count")
+
+```
+
+# Classification with Emphasis on Prediction
