@@ -33,18 +33,12 @@ library(caret)
 
 ### Import Data
 
+
 ```{r data}
 tuesdata <- tidytuesdayR::tt_load('2022-11-01')
 tuesdata <- tidytuesdayR::tt_load(2022, week = 44)
 horror <- tuesdata$horror_movies
 ```
-# Simulating the data MUST GET RID BEFORE TURNING IN!
-```{r}
-
-
-
-```
-
 
 
 ```{r glimpse}
@@ -112,6 +106,8 @@ print(na_counts_df)
 ```{r}
 sum(horror$revenue == 0)
 sum(horror$budget == 0)
+sum(horror$budget != 0 & horror$revenue != 0)
+sum(horror$budget == 0 & horror$revenue == 0)
 
 ```
 
@@ -176,28 +172,6 @@ horror$budget_category <- ifelse(horror$budget == 0, "No Budget",
                            ifelse(horror$budget < 5e7, "Medium", "High")))
 ```
 
-# Removing budget and revenue outliers
-
-```{r}
-remove_outliers <- function(data, column_name) {
-  Q1 <- quantile(data[[column_name]], 0.25, na.rm = TRUE)
-  Q3 <- quantile(data[[column_name]], 0.75, na.rm = TRUE)
-  IQR_value <- IQR(data[[column_name]], na.rm = TRUE)
-  
-  lower_bound <- Q1 - 1.5 * IQR_value
-  upper_bound <- Q3 + 1.5 * IQR_value
-  
-  data <- data[data[[column_name]] >= lower_bound & data[[column_name]] <= upper_bound, ]
-  return(data)
-}
-
-horror <- horror
-horror <- remove_outliers(horror, "budget")
-horror <- remove_outliers(horror, "revenue")
-
-```
-
-
 
 ### Create Target Variables
 
@@ -223,7 +197,7 @@ We will plot the distributions of numeric features, specifically budget, revenue
 
 ```{r num-dist}
 ggplot(horror, aes(x = budget)) +
-  geom_histogram(binwidth = 1e5, fill = "blue", color = "black", alpha = 0.7) +
+  geom_histogram(binwidth = 1e7, fill = "blue", color = "black", alpha = 0.7) +
   labs(title = "Distribution of Budget", x = "Budget", y = "Count") +
   theme_minimal()
 
@@ -448,7 +422,7 @@ ggplot(training, aes(x = success)) +
 
 
 
-# Predicting Budget using regression
+# Predicting Budget using logistic regression
 
 ```{r}
 # Create a new data frame without rows where revenue is 0
@@ -463,9 +437,76 @@ features_for_budg <- horror[, c("revenue", "popularity", "release_year")]
 target_budg <- horror$budget
 ```
 
+# Visualizaing the Relationships
+
 ```{r}
+library(ggplot2)
+
+# Scatter plots to see the relationships
+ggplot(df_for_budg, aes(x = revenue, y = budget)) +
+  geom_point() + 
+  labs(title = "Budget vs Revenue", x = "Revenue", y = "Budget") +
+  theme_minimal()
+
+ggplot(df_for_budg, aes(x = release_year, y = budget)) +
+  geom_point() + 
+  labs(title = "Budget vs Release Year", x = "Release Year", y = "Budget") +
+  theme_minimal()
+
+ggplot(df_for_budg, aes(x = popularity, y = budget)) +
+  geom_point() + 
+  labs(title = "Budget vs Popularity", x = "Popularity", y = "Budget") +
+  theme_minimal()
 
 ```
+```{r}
+max(df_for_budg$budget)
+max(df_for_budg$revenue)
+mean(df_for_budg$budget)
+mean(df_for_budg$revenue)
+```
 
+
+
+# Creating categories for logistic regression
+
+```{r}
+budget_bins <- cut(df_for_budg$budget, 
+                   breaks = c(0, 10000000, 20000000, 50000000 , Inf), 
+                   labels = c("Low", "Medium", "High", "Very High"))
+
+df_for_budg$budget_category <- budget_bins
+```
+
+# Fitting the model
+
+```{r}
+library(nnet)
+
+multi_logistic_model <- multinom(budget_category ~ revenue + release_year + popularity, 
+                                 data = df_for_budg)
+
+summary(multi_logistic_model)
+```
+
+# Predicting the categories
+
+```{r}
+# Predict the budget category for the new data
+predicted_categories <- predict(multi_logistic_model, df_for_budg)
+
+# Print predicted categories
+print(predicted_categories)
+```
+
+
+# Evaluating the Model 
+
+```{r}
+predicted_train_categories <- predict(multi_logistic_model, df_for_budg)
+
+table(Predicted = predicted_train_categories, Actual = df_for_budg$budget_category)
+
+```
 
 
