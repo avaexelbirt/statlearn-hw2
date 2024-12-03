@@ -12,7 +12,13 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r libraries}
 # Install necessary libraries if not installed
 install.packages(c("ggplot2", "dplyr", "scales", "lubridate"))
+install.packages("caret")
+install.packages("GGally")
+install.packages("tidyverse")
+```
 
+
+```{r libraries}
 # Load libraries
 library(ggplot2)
 library(dplyr)
@@ -32,6 +38,14 @@ tuesdata <- tidytuesdayR::tt_load('2022-11-01')
 tuesdata <- tidytuesdayR::tt_load(2022, week = 44)
 horror <- tuesdata$horror_movies
 ```
+# Simulating the data MUST GET RID BEFORE TURNING IN!
+```{r}
+
+
+
+```
+
+
 
 ```{r glimpse}
 glimpse(horror)
@@ -95,6 +109,13 @@ na_counts_df <- data.frame(Column = names(na_counts), NA_Count = na_counts)
 print(na_counts_df)
 
 ```
+```{r}
+sum(horror$revenue == 0)
+sum(horror$budget == 0)
+
+```
+
+
 
 For numeric columns, we will fill missing values with the median values of that column. These include id, release_date, popularity, vote_count, vote_average, revenue, and runtime. We will then fill missing character columns with "Unknown." These include original_title, title, original_language, tagline, overview, poster_path, status, adult, and backdrop_path.
 
@@ -155,6 +176,29 @@ horror$budget_category <- ifelse(horror$budget == 0, "No Budget",
                            ifelse(horror$budget < 5e7, "Medium", "High")))
 ```
 
+# Removing budget and revenue outliers
+
+```{r}
+remove_outliers <- function(data, column_name) {
+  Q1 <- quantile(data[[column_name]], 0.25, na.rm = TRUE)
+  Q3 <- quantile(data[[column_name]], 0.75, na.rm = TRUE)
+  IQR_value <- IQR(data[[column_name]], na.rm = TRUE)
+  
+  lower_bound <- Q1 - 1.5 * IQR_value
+  upper_bound <- Q3 + 1.5 * IQR_value
+  
+  data <- data[data[[column_name]] >= lower_bound & data[[column_name]] <= upper_bound, ]
+  return(data)
+}
+
+horror <- horror
+horror <- remove_outliers(horror, "budget")
+horror <- remove_outliers(horror, "revenue")
+
+```
+
+
+
 ### Create Target Variables
 
 We first create a profit variable that is the revenue minus budget of a movie. We then create a success variable: if profit \> 0, movie is considered successful
@@ -179,7 +223,7 @@ We will plot the distributions of numeric features, specifically budget, revenue
 
 ```{r num-dist}
 ggplot(horror, aes(x = budget)) +
-  geom_histogram(binwidth = 1e7, fill = "blue", color = "black", alpha = 0.7) +
+  geom_histogram(binwidth = 1e5, fill = "blue", color = "black", alpha = 0.7) +
   labs(title = "Distribution of Budget", x = "Budget", y = "Count") +
   theme_minimal()
 
@@ -193,6 +237,28 @@ ggplot(horror, aes(x = runtime)) +
   labs(title = "Distribution of Runtime", x = "Runtime (Minutes)", y = "Count") +
   theme_minimal()
 ```
+
+```{r}
+# For Budget (which has large values)
+ggplot(horror, aes(x = budget)) +
+  geom_histogram(binwidth = 1e8, fill = "blue", color = "black", alpha = 0.7) +  # Increase binwidth
+  labs(title = "Distribution of Budget", x = "Budget", y = "Count") +
+  theme_minimal()
+
+# For Revenue (which also has large values)
+ggplot(horror, aes(x = revenue)) +
+  geom_histogram(binwidth = 1e8, fill = "green", color = "black", alpha = 0.7) +  # Increase binwidth
+  labs(title = "Distribution of Revenue", x = "Revenue", y = "Count") +
+  theme_minimal()
+
+# For Runtime (which typically has smaller values)
+ggplot(horror, aes(x = runtime)) +
+  geom_histogram(binwidth = 5, fill = "red", color = "black", alpha = 0.7) +  # Adjust binwidth for runtime
+  labs(title = "Distribution of Runtime", x = "Runtime (Minutes)", y = "Count") +
+  theme_minimal()
+
+```
+
 
 Budget and revenue are both right skewed and unimodal. Runtime is also right skewed, but bimodal.
 
@@ -222,6 +288,12 @@ Release year is left skewed and unimodal.
 We will now look at the distribution of our target variable, show_or_movie.
 
 ###CHANGE WITH NEW PREDICTOR
+
+```{r}
+sum(horror$success == "Success")
+sum(horror$success == "No Success")
+```
+
 
 ```{r horrordist}
 ggplot(horror, aes(x = success)) + 
@@ -273,6 +345,13 @@ ggplot(horror, aes(x = success, y = profit, fill = success)) +
 
 ```
 
+```{r}
+sum(horror$budget == 0)
+sum(horror$budget != 0)
+```
+
+
+
 ## Split the Data
 
 ### Train and Test Data
@@ -298,7 +377,7 @@ summary(training)
 table(training$success) / length(training$success)
 ```
 
-96% successful movies, \~4% unsuccessful movies: unbalanced dataset
+4% successful movies, \ ~96% unsuccessful movies: unbalanced dataset 
 
 ### Training Visuals
 
@@ -357,13 +436,36 @@ ggplot(training, aes(x = success)) +
 
 # Classification with Emphasis on Prediction
 
+# Questions: 
+# "How well can we predict a movie's revenue based on its budget, popularity, 
+#  and release year?" (Regression)
+
+# Predicting popularity (Regression)
+
+# "Can we predict whether a movie will be profitable?" (QDA and LDA)
+
+# "predicting succes categories (hit, average, flop) (QDA and LDA)
+
+
+
+# Predicting Budget using regression
 
 ```{r}
-print("testing")
+# Create a new data frame without rows where revenue is 0
+df_for_budg = subset(horror, revenue != 0)
+
+sum(horror$revenue == 0)
 ```
 
-# please
 ```{r}
-print("this better show up")
+# Separate predictors (features) and target variable (budget)
+features_for_budg <- horror[, c("revenue", "popularity", "release_year")]
+target_budg <- horror$budget
 ```
+
+```{r}
+
+```
+
+
 
