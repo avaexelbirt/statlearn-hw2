@@ -62,19 +62,17 @@ glimpse(horror)
 
 ### Available Data
 
-The dataset contains detailed information on a wide range of horror movies, about \~35,000 pieces of entertainment, including various features such as title, genre, release date, runtime, popularity, budget, and revenue. Additional details include the movie's runtime, vote count, average vote, genre names, and collection association. Notably, the dataset also contains the poster and backdrop image URLs for each movie, as well as whether the movie is intended for adults. These data points provide a comprehensive view of each movie's performance, reception, and thematic elements, enabling further analysis on trends, movie popularity, and financial success within the horror genre. These features will be used to train a classification model to predict whether each entry is a TV show or a movie. The objective is to leverage these data points to build an accurate classification model, focusing on identifying the key predictors that contribute most to the classification process.
+The dataset contains detailed information on a wide range of horror movies, about \~35,000 pieces of entertainment, including various features such as title, genre, release date, runtime, popularity, budget, and revenue. Additional details include the movie's runtime, vote count, average vote, genre names, and collection association. Notably, the dataset also contains the poster and backdrop image URLs for each movie, as well as whether the movie is intended for adults. These data points provide a comprehensive view of each movie's performance, reception, and thematic elements, enabling further analysis on trends, movie popularity, and financial success within the horror genre. These features will be used to train a classification model to predict whether each entry is a successful movie or not. The objective is to leverage these data points to build an accurate classification model, focusing on identifying the key predictors that contribute most to the classification process.
 
 ### Motivation
 
-As the entertainment industry grows with an increasing variety of content, it's essential to classify pieces of entertainment accurately as either TV shows or movies. This classification can help content platforms optimize recommendations, improve user experience, and target specific audiences. The challenge lies in determining the most relevant features for this classification, as content may have overlapping characteristics that make it difficult to categorize.
+As the entertainment industry expands, identifying the success of a movie is critical to content platforms and production companies. Success in the entertainment industry is typically measured by revenue, budget, and audience reception. Predicting whether a movie is likely to be successful or not can help guide investment decisions, optimize content strategies, and improve user recommendations. However, accurately predicting success is a challenge due to the multifaceted nature of what contributes to a movie\'s success, including budget, genre, release time, and audience engagement factors.
 
-The classification of entertainment pieces involves weighing several factors to determine whether the content should be labeled as a movie or a TV show. Inaccurate classification could lead to inefficiencies in content distribution or misaligned recommendations, impacting user engagement. Thus, creating an accurate classification model helps reduce these inefficiencies and ensures that content is better matched to user preferences.
-
-The motivation behind this project is to explore and predict whether a piece of entertainment, such as a TV show or movie, can be accurately classified based on available features. Given the increasing variety of content in entertainment, classifying pieces as either TV shows or movies can provide valuable insights for content recommendation, content management, and audience targeting. The project focuses on building a model that can distinguish between the two types of content by leveraging different features, improving prediction accuracy and interpretability.
+In this context, predicting a movie's success involves analyzing historical data and identifying patterns that correlate with positive outcomes. By doing so, production teams and platforms can better allocate resources, strategize marketing efforts, and predict the potential success of future movies. The motivation behind this project is to build a classification model that can predict whether a movie will be successful based on various features, thus improving decision-making processes in the entertainment industry.
 
 ### Goal
 
-The primary goal of this project is to develop a classification model that accurately predicts whether a given piece of entertainment is a movie or a TV show. The project will focus on both prediction and interpretation, with a particular emphasis on selecting relevant features and comparing predictor sets. By using a variety of features, we aim to enhance the model's performance and interpretability, ultimately offering a deeper understanding of the factors that contribute to the classification process. This will allow us to make data-driven recommendations for content categorization. Using a set of features extracted from historical data on various entertainment pieces, we aim to classify each entry correctly. By identifying patterns in the data, we can predict whether new content belongs to a TV show or movie, improving content recommendation systems and user engagement strategies.
+The primary goal of this project is to develop a classification model that predicts whether a given movie is successful or not. The project will focus on feature selection, model interpretation, and the comparison of predictor sets to determine the most significant factors contributing to a movie\'s success. By analyzing a variety of features such as budget, revenue, genre, and popularity, the goal is to build a model that classifies movies as "successful" or "unsuccessful" with high accuracy. This will allow content platforms and production companies to make data-driven decisions and better understand the elements that contribute to the success of a movie.
 
 # Data Preprocessing and Visualization Tools
 
@@ -157,6 +155,16 @@ horror$budget_category <- ifelse(horror$budget == 0, "No Budget",
                            ifelse(horror$budget < 5e7, "Medium", "High")))
 ```
 
+### Create Target Variables
+
+We first create a profit variable that is the revenue minus budget of a movie. We then create a success variable: if profit \> 0, movie is considered successful
+
+```{r make-targ}
+horror$profit <- horror$revenue - horror$budget
+horror$success <- ifelse(horror$profit > 0, "Success", "No Success")
+
+```
+
 ### Correlation Analysis
 
 ```{r corr}
@@ -216,15 +224,15 @@ We will now look at the distribution of our target variable, show_or_movie.
 ###CHANGE WITH NEW PREDICTOR
 
 ```{r horrordist}
-ggplot(horror, aes(x = show_or_movie)) + 
+ggplot(horror, aes(x = success)) + 
   geom_bar(fill = "lightblue", color = "black") + 
-  labs(title = "Distribution of Show or Movie", x = "Show or Movie", y = "Count") + 
+  labs(title = "Distribution of Success of a Movie", x = "Success", y = "Count") + 
   theme_minimal()
 ```
 
 ### Variable Relationships
 
-We first examine the relationship between budget and revenue for each horror movie, with points colored by their budget category, helping to identify patterns and outliers in how budget impacts revenue. We can also visualize how the budget has evolved over the years by plotting release_year versus budget. We finally examine the relationship between `popularity` and `vote_average` to see if there's a trend in how movies' popularity correlates with their ratings.
+We first examine the relationship between budget and revenue for each horror movie, with points colored by their budget category, helping to identify patterns and outliers in how budget impacts revenue. We can also visualize how the budget has evolved over the years by plotting release_year versus budget. We then examine the relationship between `popularity` and `vote_average` to see if there's a trend in how movies' popularity correlates with their ratings. We also examine the relationship between `budget` and `profit`. Each point represents a movie, and the color differentiates between successful and non-successful movies. The idea is to see if movies with higher budgets tend to generate more profit. Finally we show how the `profit` distribution differs between successful and non-successful movies. This boxplot shows the distribution of `profit` for movies categorized as "Success" or "No Success". The plot helps visualize how profits are distributed across these categories, revealing if successful movies tend to have higher profits.
 
 ```{r}
 ggplot(horror, aes(x = budget, y = revenue)) +
@@ -241,7 +249,6 @@ ggplot(horror, aes(x = release_year, y = budget)) +
   scale_y_continuous(labels = scales::comma) +
   labs(title = "Release Year vs")
 
-
 ggplot(horror, aes(x = popularity, y = vote_average)) +
   geom_point(aes(color = genre_names), alpha = 0.7) +
   scale_x_continuous(labels = scales::comma) +
@@ -249,6 +256,20 @@ ggplot(horror, aes(x = popularity, y = vote_average)) +
   theme_minimal() +
   theme(legend.position = "none")
 
+ggplot(horror, aes(x = budget, y = profit)) + 
+  geom_point(aes(color = success), alpha = 0.6) + 
+  scale_x_continuous(labels = scales::comma) + 
+  scale_y_continuous(labels = scales::comma) + 
+  labs(title = "Budget vs. Profit", x = "Budget", y = "Profit") + 
+  theme_minimal() + 
+  theme(legend.title = element_blank())
+
+ggplot(horror, aes(x = success, y = profit, fill = success)) + 
+  geom_boxplot() + 
+  scale_y_continuous(labels = scales::comma) + 
+  labs(title = "Profit Distribution by Success", x = "Success", y = "Profit") + 
+  theme_minimal() + 
+  theme(legend.title = element_blank())
 
 ```
 
@@ -271,14 +292,13 @@ nrow(testing)
 summary(training)
 ```
 
-#CHANGE WITH NEW VARIABLE
-
 ### Distribution of Target Variable
 
 ```{r show-dist}
-table(training$show_or_movie) / length(training$show_or_movie)
-
+table(training$success) / length(training$success)
 ```
+
+96% successful movies, \~4% unsuccessful movies: unbalanced dataset
 
 ### Training Visuals
 
@@ -326,6 +346,12 @@ ggplot(training, aes(x = vote_average)) +
 ggplot(training, aes(x = release_year)) + 
   geom_bar(fill = "lightgreen") + 
   labs(title = "Release Year Distribution", x = "Release Year", y = "Count")
+
+# Visualizing the distribution of 'success' in training data
+ggplot(training, aes(x = success)) + 
+  geom_bar(fill = "lightblue", color = "black") + 
+  labs(title = "Distribution of Success", x = "Success", y = "Count") + 
+  theme_minimal()
 
 ```
 
