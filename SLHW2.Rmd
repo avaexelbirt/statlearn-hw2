@@ -1,5 +1,6 @@
 ---
 title: "SLHW2"
+author: "Ava Exelbirt, Sam Reade"
 output: html_document
 date: "2024-12-01"
 ---
@@ -8,23 +9,148 @@ date: "2024-12-01"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-
-```{r cars}
-summary(cars)
+```{r libraries}
+library(tidyverse)
+library(GGally)
 ```
 
-## Including Plots
+# About the Data
 
-You can also embed plots, for example:
+### Import Data
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r data}
+tuesdata <- tidytuesdayR::tt_load('2022-11-01')
+tuesdata <- tidytuesdayR::tt_load(2022, week = 44)
+horror <- tuesdata$horror_movies
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+glimpse(horror)
+```
+
+### Data Dictionary
+
+1.  The `id` variable is an integer that serves as a unique identifier for each movie.
+2.  The `original_title` variable is a character string representing the movie's original title.
+3.  The `title` variable is a character string containing the localized or alternative movie title.
+4.  The `original_language` variable is a character field indicating the language in which the movie was originally made.
+5.  The `overview` variable is a character field providing a brief description or synopsis of the movie.
+6.  The `tagline` variable is a character field capturing the movie's catchphrase or slogan.
+7.  The `release_date` variable is a date field that records the date when the movie was first released.
+8.  The `poster_path` variable is a character field containing the URL to the movie's poster image.
+9.  The `popularity` variable is a numerical value representing the movie's popularity score based on audience interactions.
+10. The `vote_count` variable is an integer field that records the total number of audience votes received.
+11. The `vote_average` variable is a numerical field that represents the average audience rating on a scale from 0 to 10.
+12. The `budget` variable is an integer field capturing the movie's production budget in USD.
+13. The `revenue` variable is an integer field indicating the total revenue earned by the movie in USD.
+14. The `runtime` variable is an integer field that specifies the duration of the movie in minutes.
+15. The `status` variable is a character field that indicates the current status of the movie, such as "Released."
+16. The `adult` variable is a boolean that indicates whether the movie is intended for adult audiences.
+17. The `backdrop_path` variable is a character field that provides the URL to the backdrop image for the movie.
+18. The `genre_names` variable is a character field listing the genres associated with the movie, separated by commas.
+19. The `collection` variable is a numerical field containing the unique ID of the collection the movie belongs to, which may be null for movies not part of a collection.
+20. The `collection_name` variable is a character field representing the name of the collection, which may also be null if the movie does not belong to one.
+
+### Available Data
+
+The dataset contains detailed information on a wide range of horror movies, about \~35,000 pieces of entertainment, including various features such as title, genre, release date, runtime, popularity, budget, and revenue. Additional details include the movie's runtime, vote count, average vote, genre names, and collection association. Notably, the dataset also contains the poster and backdrop image URLs for each movie, as well as whether the movie is intended for adults. These data points provide a comprehensive view of each movie's performance, reception, and thematic elements, enabling further analysis on trends, movie popularity, and financial success within the horror genre. These features will be used to train a classification model to predict whether each entry is a TV show or a movie. The objective is to leverage these data points to build an accurate classification model, focusing on identifying the key predictors that contribute most to the classification process.
+
+### Motivation
+
+As the entertainment industry grows with an increasing variety of content, it's essential to classify pieces of entertainment accurately as either TV shows or movies. This classification can help content platforms optimize recommendations, improve user experience, and target specific audiences. The challenge lies in determining the most relevant features for this classification, as content may have overlapping characteristics that make it difficult to categorize.
+
+The classification of entertainment pieces involves weighing several factors to determine whether the content should be labeled as a movie or a TV show. Inaccurate classification could lead to inefficiencies in content distribution or misaligned recommendations, impacting user engagement. Thus, creating an accurate classification model helps reduce these inefficiencies and ensures that content is better matched to user preferences.
+
+The motivation behind this project is to explore and predict whether a piece of entertainment, such as a TV show or movie, can be accurately classified based on available features. Given the increasing variety of content in entertainment, classifying pieces as either TV shows or movies can provide valuable insights for content recommendation, content management, and audience targeting. The project focuses on building a model that can distinguish between the two types of content by leveraging different features, improving prediction accuracy and interpretability.
+
+### Goal
+
+The primary goal of this project is to develop a classification model that accurately predicts whether a given piece of entertainment is a movie or a TV show. The project will focus on both prediction and interpretation, with a particular emphasis on selecting relevant features and comparing predictor sets. By using a variety of features, we aim to enhance the model\'s performance and interpretability, ultimately offering a deeper understanding of the factors that contribute to the classification process. This will allow us to make data-driven recommendations for content categorization. Using a set of features extracted from historical data on various entertainment pieces, we aim to classify each entry correctly. By identifying patterns in the data, we can predict whether new content belongs to a TV show or movie, improving content recommendation systems and user engagement strategies.
+
+# Data Preprocessing and Visualization Tools 
+
+```{r}
+summary(horror)
+```
+
+## Data Cleanup 
+
+### Handling NA Values
+
+```{r}
+# Count the number of NA values in each column
+na_counts <- colSums(is.na(horror))
+
+# Display the NA counts
+print(na_counts)
+
+# Optional: View the NA counts in a more readable format
+na_counts_df <- data.frame(Column = names(na_counts), NA_Count = na_counts)
+print(na_counts_df)
+
+```
+
+For numeric columns, we will fill missing values with the median values of that column. These include id, release_date, popularity, vote_count, vote_average, revenue, and runtime. We will then fill missing character columns with "Unknown." These include original_title, title, original_language, tagline, overview, poster_path, status, adult, and backdrop_path.
+
+```{r NAs}
+numeric_cols <- sapply(horror, is.numeric)
+horror[numeric_cols] <- lapply(horror[numeric_cols], function(x) {
+  ifelse(is.na(x), median(x, na.rm = TRUE), x)
+})
+
+## Fill missing character columns with "Unknown"
+char_cols <- sapply(horror, is.character)
+horror[char_cols] <- lapply(horror[char_cols], function(x) {
+  ifelse(is.na(x), "Unknown", x)
+})
+
+```
+
+### Drop Columns
+
+We will remove the columns ids and paths as these are not needed for our overall analysis.
+
+```{r drop}
+horror <- horror %>%
+  select(-c(id, poster_path, backdrop_path, collection, collection_name))
+```
+
+### Feature Engineering
+
+As part of feature engineering we need to create our boolean-like columns to logical data types. We will do so for the adult column. If the observation is FALSE, then it will convert to a logical operator of 0. If the observation is TRUE for this column, then it will be converted to 1. We must also convert categorical columns to factors. This includes original_language, status, and genre_names. Finally, we will extract year from release_date because this will help in further analysis.
+
+```{r feature-eng}
+horror$adult <- as.logical(horror$adult)
+
+categorical_cols <- c("original_language", "status", "genre_names")
+horror[categorical_cols] <- lapply(horror[categorical_cols], as.factor)
+
+horror$release_year <- as.numeric(substr(horror$release_date, 1, 4))
+```
+
+### Handling Outliers
+
+We will replace some outliers. Specifically, for runtime we will replace runtime with the 0 if there is a runtime that is defined as an outlier, we will replace it with 0. We will also remove rows with outliers regarding popularity that is defined as popularity above 10000. We will also categorize budget levels. We categorize movies into "Low", "Medium", or "High" budget based on the budget column:
+
+```{r outliers}
+runQ1 <- quantile(horror$runtime, 0.25, na.rm = TRUE)
+runQ3 <- quantile(horror$runtime, 0.75, na.rm = TRUE)
+IQR <- runQ3 - runQ1
+lower_bound <- runQ1 - 1.5 * IQR
+upper_bound <- runQ3 + 1.5 * IQR
+horror$runtime[horror$runtime < lower_bound | horror$runtime > upper_bound] <- 0
+
+#horror$runtime[horror$runtime <= 0 | horror$runtime > 300] <- NA
+
+horror <- horror[!(horror$popularity > 10000), ]
+
+horror$budget_category <- ifelse(horror$budget == 0, "No Budget",
+                           ifelse(horror$budget < 1e7, "Low",
+                           ifelse(horror$budget < 5e7, "Medium", "High")))
+```
+
+### Correlation Analysis
+
+```{r corr}
+ggcorr(horror[ , sapply(horror, is.numeric)], label = TRUE)
+```
