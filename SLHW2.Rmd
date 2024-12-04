@@ -351,7 +351,7 @@ summary(training)
 table(training$success) / length(training$success)
 ```
 
-4% successful movies, \ ~96% unsuccessful movies: unbalanced dataset 
+4% successful movies, \ 96% unsuccessful movies: unbalanced dataset 
 
 ### Training Visuals
 
@@ -426,15 +426,11 @@ ggplot(training, aes(x = success)) +
 
 ```{r}
 # Create a new data frame without rows where revenue is 0
-df_for_budg = subset(horror, revenue != 0)
+df_for_class = subset(horror, revenue != 0 & budget != 0)
+df_for_class$success = as.factor(df_for_class$success)
 
-sum(horror$revenue == 0)
-```
-
-```{r}
-# Separate predictors (features) and target variable (budget)
-features_for_budg <- horror[, c("revenue", "popularity", "release_year")]
-target_budg <- horror$budget
+head(df_for_class)
+dim(df_for_class)
 ```
 
 # Visualizaing the Relationships
@@ -443,70 +439,213 @@ target_budg <- horror$budget
 library(ggplot2)
 
 # Scatter plots to see the relationships
-ggplot(df_for_budg, aes(x = revenue, y = budget)) +
+ggplot(df_for_class, aes(x = revenue, y = budget)) +
   geom_point() + 
   labs(title = "Budget vs Revenue", x = "Revenue", y = "Budget") +
   theme_minimal()
 
-ggplot(df_for_budg, aes(x = release_year, y = budget)) +
+ggplot(df_for_class, aes(x = release_year, y = budget)) +
   geom_point() + 
   labs(title = "Budget vs Release Year", x = "Release Year", y = "Budget") +
   theme_minimal()
 
-ggplot(df_for_budg, aes(x = popularity, y = budget)) +
+ggplot(df_for_class, aes(x = popularity, y = budget)) +
   geom_point() + 
   labs(title = "Budget vs Popularity", x = "Popularity", y = "Budget") +
   theme_minimal()
 
+ggplot(df_for_class, aes(x = popularity, y = revenue)) +
+  geom_point() + 
+  labs(title = "Revenue vs Popularity", x = "Popularity", y = "Revenue") +
+  theme_minimal()
+
+ggplot(df_for_class, aes(x = release_year, y = revenue)) +
+  geom_point() + 
+  labs(title = "Revenue vs Release Year", x = "Release Year", y = "Revenue") +
+  theme_minimal()
+
+ggplot(df_for_class, aes(x = release_year, y = popularity)) +
+  geom_point() + 
+  labs(title = "Popularity vs Release Year", x = "Popularity", y = "Budget") +
+  theme_minimal()
+
+```
+# Classifying Success with LDA: 
+
+```{r}
+library(MASS)
+```
+
+# Training the model
+
+```{r}
+lda_model = lda(success ~ budget + release_year + runtime + popularity, data = df_for_class)
+
+lda_model
+
+```
+
+# Predicting
+
+```{r}
+predictions_LDA = predict(lda_model, newdata = df_for_class)
+
+predicted_classes_LDA = predictions_LDA$class
+
+predicted_probs_LDA = predictions_LDA$posterior
+
+predictions_LDA_counts = table(predicted_classes_LDA)
+print(predictions_LDA_counts)
+
+```
+
+# Evaluating the model with confusion matrix and accuracy calculation
+
+```{r}
+confusion_matrix_LDA = table(Predicted_LDA = predicted_classes_LDA, Actual = df_for_class$success)
+print(confusion_matrix_LDA)
+
+accuracy_LDA <- sum(predicted_classes_LDA == df_for_class$success) / nrow(df_for_class)
+print(paste("Accuracy:", round(accuracy_LDA * 100, 2), "%"))
+
+```
+
+
+# Classifying Succes with QDA 
+
+# Training the model
+```{r}
+qda_model = qda(success ~ budget + release_year + runtime + popularity, data = df_for_class)
+
+qda_model
+```
+
+# Predicting
+
+```{r}
+predictions_QDA = predict(qda_model, newdata = df_for_class)
+
+predicted_classes_QDA = predictions_QDA$class
+
+predicted_probs_QDA = predictions_QDA$posterior
+
+predictions_QDA_counts = table(predicted_classes_QDA)
+print(predictions_QDA_counts)
+```
+
+# Evaluating the model with confusion matrix and accuracy calculation: 
+
+```{r}
+confusion_matrix_QDA = table(Predicted_QDA = predicted_classes_QDA, Actual = df_for_class$success)
+print(confusion_matrix_QDA)
+
+accuracy_QDA = sum(predicted_classes_QDA == df_for_class$success) / nrow(df_for_class)
+print(paste("Accuracy:", round(accuracy_QDA * 100, 2), "%"))
+```
+
+# Classifying Success with Logistic Regression: 
+
+# Training the model 
+
+```{r}
+lg_model <- glm(success ~ budget + release_year + runtime + popularity, 
+                     data = df_for_class, 
+                     family = binomial)
+
+summary(lg_model)
+
+```
+
+# Predicting: 
+
+```{r}
+probabilities_lg = predict(lg_model, newdata = df_for_class, type = "response")
+
+predictions_lg = ifelse(probabilities_lg > 0.5, 1, 0)
+
+predictions_lg_counts = table(predictions_lg)
+print(predictions_lg_counts)
+
+```
+
+# Evaluating the model
+
+```{r}
+
+confusion_matrix_lg = table(Predicted_lg = predictions_lg, Actual = df_for_class$success)
+print(confusion_matrix_lg)
+
+accuracy_lg = sum(predictions_lg == df_for_class$success) / length(predictions_lg)
+print(paste("Accuracy: ", accuracy_lg))
+
 ```
 ```{r}
-max(df_for_budg$budget)
-max(df_for_budg$revenue)
-mean(df_for_budg$budget)
-mean(df_for_budg$revenue)
+levels(df_for_class$success)
+
+# Check the unique values in the predicted outcomes
+unique(predictions_lg)
 ```
 
 
-
-# Creating categories for logistic regression
+# Classifying Budget into four predicted groups with multinomial logistic regression: 
 
 ```{r}
-budget_bins <- cut(df_for_budg$budget, 
-                   breaks = c(0, 10000000, 20000000, 50000000 , Inf), 
-                   labels = c("Low", "Medium", "High", "Very High"))
+if (!require("nnet")) install.packages("nnet")
+library(nnet)
+```
 
-df_for_budg$budget_category <- budget_bins
+# Preparing target
+```{r}
+budget_quartiles <- quantile(df_for_class$budget, probs = c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE)
+budget_quartiles <- unique(budget_quartiles)  # Remove duplicate values
+
+if (length(budget_quartiles) - 1 != 4) {
+  stop("Unable to create exactly 4 quartile groups due to duplicate breaks. Please inspect the data.")
+}
+
+# Assign budget categories
+df_for_class$budget_category <- cut(
+  df_for_class$budget, 
+  breaks = budget_quartiles, 
+  labels = c("Low", "Medium", "High", "Very High"), 
+  include.lowest = TRUE
+)
+
+table(df_for_class$budget_category)
+
 ```
 
 # Fitting the model
-
 ```{r}
-library(nnet)
+df_for_class$budget_category <- as.factor(df_for_class$budget_category)
 
-multi_logistic_model <- multinom(budget_category ~ revenue + release_year + popularity, 
-                                 data = df_for_budg)
-
-summary(multi_logistic_model)
+multinom_model <- multinom(budget_category ~ revenue + release_year + popularity, data = df_for_class)
 ```
 
-# Predicting the categories
-
+# Step 4: Check the model summary
 ```{r}
-# Predict the budget category for the new data
-predicted_categories <- predict(multi_logistic_model, df_for_budg)
+summary(multinom_model)
+```
 
-# Print predicted categories
-print(predicted_categories)
+# Predict classifications
+```{r}
+predicted_categories = predict(multinom_model, newdata = df_for_class)
+
+category_counts = table(predicted_categories)
+print(category_counts)
+
+```
+
+# Evaluating model with confusion matrix and calculating accuracy
+```{r}
+
+table(Predicted = predicted_categories, Actual = df_for_class$budget_category)
+
+accuracy <- mean(predicted_categories == df_for_class$budget_category)
+cat("Accuracy:", accuracy)
+
 ```
 
 
-# Evaluating the Model 
-
-```{r}
-predicted_train_categories <- predict(multi_logistic_model, df_for_budg)
-
-table(Predicted = predicted_train_categories, Actual = df_for_budg$budget_category)
-
-```
 
 
