@@ -17,7 +17,6 @@ install.packages("GGally")
 install.packages("tidyverse")
 ```
 
-
 ```{r libraries}
 # Load libraries
 library(ggplot2)
@@ -33,13 +32,11 @@ library(caret)
 
 ### Import Data
 
-
 ```{r data}
 tuesdata <- tidytuesdayR::tt_load('2022-11-01')
 tuesdata <- tidytuesdayR::tt_load(2022, week = 44)
 horror <- tuesdata$horror_movies
 ```
-
 
 ```{r glimpse}
 glimpse(horror)
@@ -103,6 +100,7 @@ na_counts_df <- data.frame(Column = names(na_counts), NA_Count = na_counts)
 print(na_counts_df)
 
 ```
+
 ```{r}
 sum(horror$revenue == 0)
 sum(horror$budget == 0)
@@ -110,8 +108,6 @@ sum(horror$budget != 0 & horror$revenue != 0)
 sum(horror$budget == 0 & horror$revenue == 0)
 
 ```
-
-
 
 For numeric columns, we will fill missing values with the median values of that column. These include id, release_date, popularity, vote_count, vote_average, revenue, and runtime. We will then fill missing character columns with "Unknown." These include original_title, title, original_language, tagline, overview, poster_path, status, adult, and backdrop_path.
 
@@ -171,7 +167,6 @@ horror$budget_category <- ifelse(horror$budget == 0, "No Budget",
                            ifelse(horror$budget < 1e7, "Low",
                            ifelse(horror$budget < 5e7, "Medium", "High")))
 ```
-
 
 ### Create Target Variables
 
@@ -233,7 +228,6 @@ ggplot(horror, aes(x = runtime)) +
 
 ```
 
-
 Budget and revenue are both right skewed and unimodal. Runtime is also right skewed, but bimodal.
 
 ### Distribution of Some Categorical Features
@@ -267,7 +261,6 @@ We will now look at the distribution of our target variable, show_or_movie.
 sum(horror$success == "Success")
 sum(horror$success == "No Success")
 ```
-
 
 ```{r horrordist}
 ggplot(horror, aes(x = success)) + 
@@ -324,8 +317,6 @@ sum(horror$budget == 0)
 sum(horror$budget != 0)
 ```
 
-
-
 ## Split the Data
 
 ### Train and Test Data
@@ -351,7 +342,7 @@ summary(training)
 table(training$success) / length(training$success)
 ```
 
-4% successful movies, \ 96% unsuccessful movies: unbalanced dataset 
+4% successful movies,  96% unsuccessful movies: unbalanced dataset
 
 ### Training Visuals
 
@@ -410,19 +401,13 @@ ggplot(training, aes(x = success)) +
 
 # Classification with Emphasis on Prediction
 
-# Questions: 
-# "How well can we predict a movie's revenue based on its budget, popularity, 
-#  and release year?" (Regression)
+## Questions We Aim to Answer:
 
-# Predicting popularity (Regression)
-
-# "Can we predict whether a movie will be profitable?" (QDA and LDA)
-
-# "predicting succes categories (hit, average, flop) (QDA and LDA)
-
-
-
-# Predicting Budget using logistic regression
+1.  "How well can we predict a movie's revenue based on its budget, popularity, and release year?" (Regression)
+2.  Predicting popularity (Regression)
+3.  "Can we predict whether a movie will be profitable?" (QDA and LDA)
+4.  "predicting succes categories (hit, average, flop) (QDA and LDA)
+5.  Predicting Budget using logistic regression
 
 ```{r}
 # Create a new data frame without rows where revenue is 0
@@ -433,7 +418,7 @@ head(df_for_class)
 dim(df_for_class)
 ```
 
-# Visualizaing the Relationships
+## Visualizaing the Relationships
 
 ```{r}
 library(ggplot2)
@@ -470,13 +455,14 @@ ggplot(df_for_class, aes(x = release_year, y = popularity)) +
   theme_minimal()
 
 ```
-# Classifying Success with LDA: 
+
+## Classifying Success with LDA:
 
 ```{r}
 library(MASS)
 ```
 
-# Training the model
+### Training the model
 
 ```{r}
 lda_model = lda(success ~ budget + release_year + runtime + popularity, data = df_for_class)
@@ -485,7 +471,7 @@ lda_model
 
 ```
 
-# Predicting
+### Predicting
 
 ```{r}
 predictions_LDA = predict(lda_model, newdata = df_for_class)
@@ -499,7 +485,7 @@ print(predictions_LDA_counts)
 
 ```
 
-# Evaluating the model with confusion matrix and accuracy calculation
+### Evaluating the model with confusion matrix and accuracy calculation
 
 ```{r}
 confusion_matrix_LDA = table(Predicted_LDA = predicted_classes_LDA, Actual = df_for_class$success)
@@ -510,17 +496,17 @@ print(paste("Accuracy:", round(accuracy_LDA * 100, 2), "%"))
 
 ```
 
+## Classifying Succes with QDA
 
-# Classifying Succes with QDA 
+### Training the model
 
-# Training the model
 ```{r}
 qda_model = qda(success ~ budget + release_year + runtime + popularity, data = df_for_class)
 
 qda_model
 ```
 
-# Predicting
+### Predicting
 
 ```{r}
 predictions_QDA = predict(qda_model, newdata = df_for_class)
@@ -533,7 +519,7 @@ predictions_QDA_counts = table(predicted_classes_QDA)
 print(predictions_QDA_counts)
 ```
 
-# Evaluating the model with confusion matrix and accuracy calculation: 
+### Evaluating the model with confusion matrix and accuracy calculation:
 
 ```{r}
 confusion_matrix_QDA = table(Predicted_QDA = predicted_classes_QDA, Actual = df_for_class$success)
@@ -543,9 +529,11 @@ accuracy_QDA = sum(predicted_classes_QDA == df_for_class$success) / nrow(df_for_
 print(paste("Accuracy:", round(accuracy_QDA * 100, 2), "%"))
 ```
 
-# Classifying Success with Logistic Regression: 
+## Classifying Success with Logistic Regression:
 
-# Training the model 
+Objective is to predict whether a movie is successful using logistic regression based on budget, release year, runtime, and popularity.
+
+### Training the model
 
 ```{r}
 lg_model <- glm(success ~ budget + release_year + runtime + popularity, 
@@ -556,7 +544,7 @@ summary(lg_model)
 
 ```
 
-# Predicting: 
+### Predicting:
 
 ```{r}
 probabilities_lg = predict(lg_model, newdata = df_for_class, type = "response")
@@ -568,7 +556,7 @@ print(predictions_lg_counts)
 
 ```
 
-# Evaluating the model
+### Evaluating the model
 
 ```{r}
 
@@ -579,6 +567,9 @@ accuracy_lg = sum(predictions_lg == df_for_class$success) / length(predictions_l
 print(paste("Accuracy: ", accuracy_lg))
 
 ```
+
+The confusion matrix shows the distribution of correct and incorrect predictions. The accuracy percentage provides a measure of how well the model predicts movie success.
+
 ```{r}
 levels(df_for_class$success)
 
@@ -586,15 +577,15 @@ levels(df_for_class$success)
 unique(predictions_lg)
 ```
 
-
-# Classifying Budget into four predicted groups with multinomial logistic regression: 
+## Classifying Budget into four predicted groups with multinomial logistic regression:
 
 ```{r}
 if (!require("nnet")) install.packages("nnet")
 library(nnet)
 ```
 
-# Preparing target
+### Preparing target
+
 ```{r}
 budget_quartiles <- quantile(df_for_class$budget, probs = c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE)
 budget_quartiles <- unique(budget_quartiles)  # Remove duplicate values
@@ -615,19 +606,22 @@ table(df_for_class$budget_category)
 
 ```
 
-# Fitting the model
+### Fitting the model
+
 ```{r}
 df_for_class$budget_category <- as.factor(df_for_class$budget_category)
 
 multinom_model <- multinom(budget_category ~ revenue + release_year + popularity, data = df_for_class)
 ```
 
-# Step 4: Check the model summary
+### Check the model summary
+
 ```{r}
 summary(multinom_model)
 ```
 
-# Predict classifications
+### Predict classifications
+
 ```{r}
 predicted_categories = predict(multinom_model, newdata = df_for_class)
 
@@ -636,7 +630,8 @@ print(category_counts)
 
 ```
 
-# Evaluating model with confusion matrix and calculating accuracy
+### Evaluating model with confusion matrix and calculating accuracy
+
 ```{r}
 
 table(Predicted = predicted_categories, Actual = df_for_class$budget_category)
@@ -646,6 +641,292 @@ cat("Accuracy:", accuracy)
 
 ```
 
+# Classification with Emphasis on Interpretation 
 
+## Classifying Success with LDA
 
+### Train the Model
 
+```{r}
+lda_model <- lda(success ~ budget + release_year + runtime + popularity, data = df_for_class)
+
+# View model coefficients and posterior probabilities
+print(lda_model)
+```
+
+### Predicting
+
+We will first predict success categories and then add the predictions to the dataset.
+
+```{r}
+predictions <- predict(lda_model, newdata = df_for_class)
+
+df_for_class$lda_predicted_success <- predictions$class
+```
+
+### Evaluating the Model
+
+We will use the confusion matrix and accuracy to evaluate the model.
+
+```{r}
+lda_confusion_matrix <- table(Predicted = predictions$class, Actual = df_for_class$success)
+
+lda_accuracy <- sum(predictions$class == df_for_class$success) / nrow(df_for_class)
+
+print(lda_confusion_matrix)
+cat("LDA Accuracy: ", round(lda_accuracy * 100, 2), "%\n")
+```
+
+### Visualizing Decision Boundaries
+
+```{r}
+ggplot(df_for_class, aes(x = budget, y = popularity, color = lda_predicted_success)) +
+  geom_point(alpha = 0.6) +
+  labs(title = "Decision Boundaries from LDA", x = "Budget", y = "Popularity") +
+  theme_minimal()
+```
+
+## Classifying Success with Decision Trees
+
+The decision tree structure shows how features like budget and popularity split the data to classify movies. The path from root to leaf highlights the decision rules. This easily identifies the most important features based on the splits.
+
+### Fit the Model
+
+```{r}
+tree_model <- rpart(success ~ budget + release_year + runtime + popularity, data = df_for_class, method = "class")
+```
+
+### Visualize the Trees
+
+```{r}
+if (!require("rpart.plot")) install.packages("rpart.plot")
+library(rpart.plot)
+rpart.plot(tree_model, type = 3, extra = 101, under = TRUE, fallen.leaves = TRUE)
+```
+
+### Predicting
+
+```{r}
+tree_predictions <- predict(tree_model, newdata = df_for_class, type = "class")
+```
+
+### Evaluating the Model
+
+Use the confusion matrix to evaluate the model.
+
+```{r}
+tree_confusion <- table(Predicted = tree_predictions, Actual = df_for_class$success)
+accuracy_tree <- sum(tree_predictions == df_for_class$success) / nrow(df_for_class)
+
+cat("Decision Tree Confusion Matrix:\n")
+print(tree_confusion)
+cat("Decision Tree Accuracy: ", round(accuracy_tree * 100, 2), "%\n")
+```
+
+## Classifying Success with Random Forest (with Feature Importance)
+
+### Fit the Model
+
+```{r}
+library(randomForest)
+
+rf_model <- randomForest(success ~ budget + release_year + runtime + popularity, data = df_for_class, importance = TRUE)
+
+```
+
+### View Variable Importance
+
+This shows which features contribute most to the model.
+
+```{r}
+importance <- importance(rf_model)
+varImpPlot(rf_model)
+```
+
+### Prediction
+
+```{r}
+rf_predictions <- predict(rf_model, newdata = df_for_class)
+```
+
+### Evaluating the Model
+
+Use a confusion matrix to evaluate the model.
+
+```{r}
+rf_confusion <- table(Predicted = rf_predictions, Actual = df_for_class$success)
+accuracy_rf <- sum(rf_predictions == df_for_class$success) / nrow(df_for_class)
+
+cat("Random Forest Confusion Matrix:\n")
+print(rf_confusion)
+cat("Random Forest Accuracy: ", round(accuracy_rf * 100, 2), "%\n")
+
+```
+
+## Classifying Success with Naive Bayes
+
+The probabilities for each class provide insight into model confidence.
+
+### Train the Model
+
+```{r}
+library(e1071)
+
+nb_model <- naiveBayes(success ~ budget + release_year + runtime + popularity, data = df_for_class)
+
+```
+
+### Prediction
+
+```{r}
+nb_predictions <- predict(nb_model, newdata = df_for_class)
+```
+
+### Evaluating the Model
+
+Use a confusion matrix to evaluate the model.
+
+```{r}
+nb_confusion <- table(Predicted = nb_predictions, Actual = df_for_class$success)
+accuracy_nb <- sum(nb_predictions == df_for_class$success) / nrow(df_for_class)
+
+cat("Naïve Bayes Confusion Matrix:\n")
+print(nb_confusion)
+cat("Naïve Bayes Accuracy: ", round(accuracy_nb * 100, 2), "%\n")
+```
+
+**Prediction** using Logistic regression answers the question, "Can we predict success?"
+
+**Interpretation** using LDA highlights "Why are some movies predicted as successful or unsuccessful?" by examining variable relationships and decision boCundaries.
+
+# Feature Selection and Comparison of Predictor Sets
+
+## Feature Importance Analysis
+
+### Correlation Analysis for Continuous Variables
+
+We will analyze the correlation between predictors and the target variable, success. We will identify multicollinearity among predictors to avoid redudancy. We will do so by looking at a correlation matrix for numeric predictors.
+
+```{r}
+numeric_vars <- df_for_class[, sapply(df_for_class, is.numeric)]
+correlation_matrix <- cor(numeric_vars)
+library(corrplot)
+corrplot(correlation_matrix, method = "circle")
+
+```
+
+Interpretation: (ADD with context)
+
+-   Strong correlations (close to ±1) between a predictor and `success` suggest high relevance.
+
+-   Avoid using highly correlated predictors simultaneously to prevent redundancy.
+
+### Feature Importance from Random Forest 
+
+Random Forest provides a direct measure of feature importance.
+
+```{r}
+rf_model <- randomForest(success ~ budget + release_year + runtime + popularity, data = df_for_class, importance = TRUE)
+varImpPlot(rf_model)
+```
+
+Interpretation: (ADD with context)
+
+-   The variable importance plot ranks features based on their contribution to classification accuracy.
+
+-   Features with higher Mean Decrease Accuracy or Mean Decrease Gini should be prioritized.
+
+### Stepwise Selection
+
+We can use stepwise regression to identify the most relevant features for logistic regression.
+
+```{r}
+full_model <- glm(success ~ budget + release_year + runtime + popularity, data = df_for_class, family = binomial)
+step_model <- stepAIC(full_model, direction = "both")
+summary(step_model)
+```
+
+Interpretation: (ADD with context)
+
+-   Features retained in the final model are likely to be the most predictive.
+
+## Comparing Predictor Sets
+
+### Base Set of Predictors
+
+We will use all available predictors: budget, release_year, runtime, and popularity.
+
+```{r}
+base_model <- glm(success ~ budget + release_year + runtime + popularity, data = df_for_class, family = binomial)
+base_probs <- predict(base_model, type = "response")
+base_preds <- ifelse(base_probs > 0.5, 1, 0)
+base_accuracy <- mean(base_preds == df_for_class$success)
+cat("Base Model Accuracy: ", base_accuracy, "\n")
+
+```
+
+### Reduced Set of Predictors
+
+We will now use only the most important predictors identifies through feature selection **(ADD WHEN FOUND ABOVE).**
+
+```{r}
+#EXAMPLE BUT CHANGE WHEN FIND PREDICYORS TO USE
+reduced_model <- glm(success ~ budget + popularity, data = df_for_class, family = binomial)
+reduced_probs <- predict(reduced_model, type = "response")
+reduced_preds <- ifelse(reduced_probs > 0.5, 1, 0)
+reduced_accuracy <- mean(reduced_preds == df_for_class$success)
+cat("Reduced Model Accuracy: ", reduced_accuracy, "\n")
+
+```
+
+### Adding Interaction Terms
+
+We can test whether interaction terms improve model performance.
+
+```{r}
+interaction_model <- glm(success ~ budget * popularity + runtime, data = df_for_class, family = binomial)
+interaction_probs <- predict(interaction_model, type = "response")
+interaction_preds <- ifelse(interaction_probs > 0.5, 1, 0)
+interaction_accuracy <- mean(interaction_preds == df_for_class$success)
+cat("Interaction Model Accuracy: ", interaction_accuracy, "\n")
+
+```
+
+### Cross-Validation to Compare Models
+
+Use cross-validation to evaluate the generalizability of each predictor set.
+
+```{r}
+# Base Model
+base_cv <- train(success ~ budget + release_year + runtime + popularity, data = df_for_class, method = "glm", family = binomial, trControl = trainControl(method = "cv", number = 5))
+print(base_cv)
+
+# Reduced Model
+reduced_cv <- train(success ~ budget + popularity, data = df_for_class, method = "glm", family = binomial, trControl = trainControl(method = "cv", number = 5))
+print(reduced_cv)
+```
+
+## Visualize Feature Importance
+
+### Effect Plots for Logistic Regression
+
+Visualize the effect of individual predictors on the probability of success.
+
+```{r}
+library(effects)
+effect_plot <- allEffects(reduced_model)
+plot(effect_plot)
+```
+
+### Partial Dependence Plots
+
+Use this for tree based models like Random Forest.
+
+```{r}
+library(pdp)
+
+# Partial dependence for "budget"
+pd_budget <- partial(rf_model, pred.var = "budget")
+plotPartial(pd_budget)
+
+```
