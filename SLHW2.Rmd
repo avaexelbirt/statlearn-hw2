@@ -11,10 +11,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r libraries}
 # Install necessary libraries if not installed
-install.packages(c("ggplot2", "dplyr", "scales", "lubridate"))
-install.packages("caret")
-install.packages("GGally")
-install.packages("tidyverse")
+# install.packages(c("ggplot2", "dplyr", "scales", "lubridate"))
+# install.packages("caret")
+# install.packages("GGally")
+# install.packages("tidyverse")
+install.packages("randomForest")
 ```
 
 ```{r libraries}
@@ -26,6 +27,8 @@ library(lubridate)
 library(tidyverse)
 library(GGally)
 library(caret)
+library(rpart)
+library(rpart.plot)
 ```
 
 # About the Data
@@ -795,6 +798,73 @@ print(nb_confusion)
 cat("Naïve Bayes Accuracy: ", round(accuracy_nb * 100, 2), "%\n")
 ```
 
+# Classifying with Gradient Boosting
+
+```{r}
+install.packages("xgboost")
+library(xgboost)
+```
+
+# Defining target and training data 
+
+```{r}
+GB_training = df_for_class[, c("runtime", "popularity", "budget", "revenue")]
+GB_target = df_for_class$success
+
+GB_target = as.numeric(factor(GB_target)) - 1  
+
+set.seed(123)  
+train_index = createDataPartition(y, p = 0.8, list = FALSE)  
+X_train = GB_training[train_index, ]
+y_train = GB_target[train_index]
+X_test = GB_training[-train_index, ]
+y_test = GB_target[-train_index]
+
+# Converting data to DMatrix (optimized format for xgboost)
+dtrain = xgb.DMatrix(data = as.matrix(X_train), label = y_train)
+dtest = xgb.DMatrix(data = as.matrix(X_test), label = y_test)
+```
+
+
+
+```{r}
+# Setting hyperparameters 
+params = list(
+  objective = "binary:logistic",  
+  eval_metric = "logloss",  
+  max_depth = 6,  
+  eta = 0.1,  
+  nthread = 2,  
+  colsample_bytree = 0.8,  
+  subsample = 0.8  
+)
+
+# Training xgboost model
+xgb_model = xgb.train(
+  params = params,
+  data = dtrain,
+  nrounds = 100,  
+  watchlist = list(train = dtrain, test = dtest),  
+  early_stopping_rounds = 10
+)
+
+```
+
+# Evaluating GB model
+
+```{r}
+y_pred = predict(xgb_model, dtest)
+
+y_pred_class = ifelse(y_pred > 0.5, 1, 0)
+
+# Calculating accuracy
+accuracy = mean(y_pred_class == y_test)
+cat("Test Accuracy: ", accuracy, "\n")
+
+```
+
+
+
 **Prediction** using Logistic regression answers the question, "Can we predict success?"
 
 **Interpretation** using LDA highlights "Why are some movies predicted as successful or unsuccessful?" by examining variable relationships and decision boCundaries.
@@ -870,7 +940,7 @@ cat("Base Model Accuracy: ", base_accuracy, "\n")
 We will now use only the most important predictors identifies through feature selection **(ADD WHEN FOUND ABOVE).**
 
 ```{r}
-#EXAMPLE BUT CHANGE WHEN FIND PREDICYORS TO USE
+#EXAMPLE BUT CHANGE WHEN FIND PREDICTORS TO USE
 reduced_model <- glm(success ~ budget + popularity, data = df_for_class, family = binomial)
 reduced_probs <- predict(reduced_model, type = "response")
 reduced_preds <- ifelse(reduced_probs > 0.5, 1, 0)
@@ -913,7 +983,12 @@ print(reduced_cv)
 Visualize the effect of individual predictors on the probability of success.
 
 ```{r}
+install.packages("effects")
 library(effects)
+```
+
+```{r}
+
 effect_plot <- allEffects(reduced_model)
 plot(effect_plot)
 ```
@@ -923,10 +998,18 @@ plot(effect_plot)
 Use this for tree based models like Random Forest.
 
 ```{r}
+install.packages("pdp")
 library(pdp)
+```
 
+```{r}
 # Partial dependence for "budget"
 pd_budget <- partial(rf_model, pred.var = "budget")
 plotPartial(pd_budget)
 
 ```
+```{r}
+pd_popularity <- partial(rf_model, pred.var = "popularity")
+plotPartial(pd_popularity)
+```
+
