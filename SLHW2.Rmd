@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # install.packages("caret")
 # install.packages("GGally")
 # install.packages("tidyverse")
-install.packages("randomForest")
+#install.packages("randomForest")
 ```
 
 ```{r libraries}
@@ -36,9 +36,9 @@ library(rpart.plot)
 ### Import Data
 
 ```{r data}
-tuesdata <- tidytuesdayR::tt_load('2022-11-01')
-tuesdata <- tidytuesdayR::tt_load(2022, week = 44)
-horror <- tuesdata$horror_movies
+#tuesdata <- tidytuesdayR::tt_load('2022-11-01')
+#tuesdata <- tidytuesdayR::tt_load(2022, week = 44)
+#horror <- tuesdata$horror_movies
 ```
 
 ```{r glimpse}
@@ -562,7 +562,7 @@ print(predictions_lg_counts)
 ### Evaluating the model
 
 ```{r}
-
+#debug this part
 confusion_matrix_lg = table(Predicted_lg = predictions_lg, Actual = df_for_class$success)
 print(confusion_matrix_lg)
 
@@ -644,7 +644,7 @@ cat("Accuracy:", accuracy)
 
 ```
 
-# Classification with Emphasis on Interpretation 
+# Classification with Emphasis on Interpretation
 
 ## Classifying Success with LDA
 
@@ -805,16 +805,17 @@ install.packages("xgboost")
 library(xgboost)
 ```
 
-# Defining target and training data 
+# Defining target and training data
 
 ```{r}
+#debugg
 GB_training = df_for_class[, c("runtime", "popularity", "budget", "revenue")]
 GB_target = df_for_class$success
 
 GB_target = as.numeric(factor(GB_target)) - 1  
 
 set.seed(123)  
-train_index = createDataPartition(y, p = 0.8, list = FALSE)  
+train_index = createDataPartition(success, p = 0.8, list = FALSE)  
 X_train = GB_training[train_index, ]
 y_train = GB_target[train_index]
 X_test = GB_training[-train_index, ]
@@ -824,8 +825,6 @@ y_test = GB_target[-train_index]
 dtrain = xgb.DMatrix(data = as.matrix(X_train), label = y_train)
 dtest = xgb.DMatrix(data = as.matrix(X_test), label = y_test)
 ```
-
-
 
 ```{r}
 # Setting hyperparameters 
@@ -863,8 +862,6 @@ cat("Test Accuracy: ", accuracy, "\n")
 
 ```
 
-
-
 **Prediction** using Logistic regression answers the question, "Can we predict success?"
 
 **Interpretation** using LDA highlights "Why are some movies predicted as successful or unsuccessful?" by examining variable relationships and decision boCundaries.
@@ -891,7 +888,7 @@ Interpretation: (ADD with context)
 
 -   Avoid using highly correlated predictors simultaneously to prevent redundancy.
 
-### Feature Importance from Random Forest 
+### Feature Importance from Random Forest
 
 Random Forest provides a direct measure of feature importance.
 
@@ -1008,8 +1005,8 @@ pd_budget <- partial(rf_model, pred.var = "budget")
 plotPartial(pd_budget)
 
 ```
+
 ```{r}
 pd_popularity <- partial(rf_model, pred.var = "popularity")
 plotPartial(pd_popularity)
 ```
-
