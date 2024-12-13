@@ -29,6 +29,8 @@ library(GGally)
 library(caret)
 library(rpart)
 library(rpart.plot)
+library(nnet)
+library(gbm)
 ```
 
 # About the Data
@@ -37,8 +39,8 @@ library(rpart.plot)
 
 ```{r data}
 #tuesdata <- tidytuesdayR::tt_load('2022-11-01')
-#tuesdata <- tidytuesdayR::tt_load(2022, week = 44)
-#horror <- tuesdata$horror_movies
+tuesdata <- tidytuesdayR::tt_load(2022, week = 44)
+horror <- tuesdata$horror_movies
 ```
 
 ```{r glimpse}
@@ -409,7 +411,7 @@ ggplot(training, aes(x = success)) +
 1.  "How well can we predict a movie's revenue based on its budget, popularity, and release year?" (Regression)
 2.  Predicting popularity (Regression)
 3.  "Can we predict whether a movie will be profitable?" (QDA and LDA)
-4.  "predicting succes categories (hit, average, flop) (QDA and LDA)
+4.  "predicting success categories (hit, average, flop) (QDA and LDA)
 5.  Predicting Budget using logistic regression
 
 ```{r}
@@ -421,7 +423,7 @@ head(df_for_class)
 dim(df_for_class)
 ```
 
-## Visualizaing the Relationships
+## Visualizing the Relationships
 
 ```{r}
 library(ggplot2)
@@ -476,6 +478,8 @@ lda_model
 
 ### Predicting
 
+We will first predict success categories and then add the predictions to the LDA dataset for visualizing the predictions.
+
 ```{r}
 predictions_LDA = predict(lda_model, newdata = df_for_class)
 
@@ -486,20 +490,35 @@ predicted_probs_LDA = predictions_LDA$posterior
 predictions_LDA_counts = table(predicted_classes_LDA)
 print(predictions_LDA_counts)
 
+predictions <- predict(lda_model, newdata = df_for_class)
+
+df_for_class$lda_predicted_success <- predictions$class
+
 ```
 
-### Evaluating the model with confusion matrix and accuracy calculation
+### Evaluating the Model 
+
+We will use the confusion matrix and accuracy calculations to show the accuracy of the model.
 
 ```{r}
 confusion_matrix_LDA = table(Predicted_LDA = predicted_classes_LDA, Actual = df_for_class$success)
 print(confusion_matrix_LDA)
 
 accuracy_LDA <- sum(predicted_classes_LDA == df_for_class$success) / nrow(df_for_class)
-print(paste("Accuracy:", round(accuracy_LDA * 100, 2), "%"))
+print(paste("Accuracy:", round(accuracy_LDA * 100, 4), "%"))
 
 ```
 
-## Classifying Succes with QDA
+### Visualizing Decision Boundaries
+
+```{r}
+ggplot(df_for_class, aes(x = budget, y = popularity, color = lda_predicted_success)) +
+  geom_point(alpha = 0.6) +
+  labs(title = "Decision Boundaries from LDA", x = "Budget", y = "Popularity") +
+  theme_minimal()
+```
+
+## Classifying Success with QDA
 
 ### Training the model
 
@@ -522,15 +541,169 @@ predictions_QDA_counts = table(predicted_classes_QDA)
 print(predictions_QDA_counts)
 ```
 
-### Evaluating the model with confusion matrix and accuracy calculation:
+### Evaluating the Model
+
+We will use the confusion matrix and accuracy calculations to show the accuracy of the model.
 
 ```{r}
 confusion_matrix_QDA = table(Predicted_QDA = predicted_classes_QDA, Actual = df_for_class$success)
 print(confusion_matrix_QDA)
 
 accuracy_QDA = sum(predicted_classes_QDA == df_for_class$success) / nrow(df_for_class)
-print(paste("Accuracy:", round(accuracy_QDA * 100, 2), "%"))
+print(paste("Accuracy:", round(accuracy_QDA * 100, 4), "%"))
 ```
+
+## Classifying Success with Naive Bayes:
+
+Naive Bayes is a probabilistic model based on Bayes' Theorem. The model assumes that the features are conditionally independent given the target variable, success.
+
+### Training the Model
+
+```{r}
+library(e1071)
+
+nb_model <- naiveBayes(success ~ budget + release_year + runtime + popularity, data = df_for_class)
+
+print(nb_model)
+
+```
+
+### Predicting
+
+```{r}
+predictions_nb <- predict(nb_model, df_for_class)
+
+predictions_nb_counts <- table(predictions_nb)
+print(predictions_nb_counts)
+
+```
+
+### Evaluating the Model
+
+We will use a confusion matrix to show model accuracy.
+
+```{r}
+confusion_matrix_nb <- table(Predicted_NB = predictions_nb, Actual = df_for_class$success)
+print(confusion_matrix_nb)
+
+
+accuracy_nb <- sum(predictions_nb == df_for_class$success) / nrow(df_for_class)
+print(paste("Accuracy: ", round(accuracy_nb *100, 4), "%"))
+
+
+```
+
+## Classifying Success with Shrinkage:
+
+Shrinkage methods we will use are Lasso and Ridge Regression. Lasso helps with feature selection and Ridge Regression helps with handling multicollinearity.
+
+### Ridge Regression
+
+Ridge regression reduces variance in the presence of highly correlated predictors like budget and popularity, ensuring effective predictions. Although all predictors are kept, their coefficients are shrunk, reflecting their relative importance. For instance, popularity might have a higher coefficient than runtime, indicating its stronger influence on predicting success. This is useful because some filmmakers may want a holistic view of all contributing factors, even those with smaller effects.
+
+#### Training the Model
+
+We will fit the Ridge model with cross-validation to find the optimal lambda. Then, we will use that best lambda to train the model.
+
+```{r}
+
+library(glmnet)
+
+x <- model.matrix(success ~ budget + release_year + runtime + popularity, data = df_for_class)[, -1]  
+y <- ifelse(df_for_class$success == "Success", 1, 0)  
+
+set.seed(123) 
+ridge_cv <- cv.glmnet(x, y, alpha = 0, family = "binomial") 
+
+best_lambda_ridge <- ridge_cv$lambda.min
+print(paste("Optimal Lambda for Ridge Regression: ", best_lambda_ridge))
+
+ridge_model <- glmnet(x, y, alpha = 0, family = "binomial", lambda = best_lambda_ridge)
+
+```
+
+#### Predicting
+
+```{r}
+
+ridge_probabilities <- predict(ridge_model, newx = x, type = "response")
+
+ridge_predictions <- ifelse(ridge_probabilities > 0.5, 1, 0)
+
+
+ridge_prediction_counts <- table(ridge_predictions)
+print(ridge_prediction_counts)
+
+```
+
+#### Evaluating the Model
+
+We will use a confusion matrix to evaluate the model accuracy.
+
+```{r}
+ridge_confusion_matrix <- table(Predicted = ridge_predictions, Actual = y)
+print(ridge_confusion_matrix)
+
+
+ridge_accuracy <- sum(ridge_predictions == y) / length(y)
+print(paste("Accuracy of Ridge Regression: ", round(ridge_accuracy * 100, 4), "%"))
+
+ridge_coefficients <- as.matrix(coef(ridge_model))
+print(ridge_coefficients)
+
+```
+
+### Lasso Regression
+
+#### Training the Model
+
+We will fit the Lasso model with cross-validation to find the optimal lambda. Then, using this best lambda we will train the Lasso model with it.
+
+```{r}
+
+set.seed(123) 
+lasso_cv <- cv.glmnet(x, y, alpha = 1, family = "binomial") 
+
+best_lambda_lasso <- lasso_cv$lambda.min
+print(paste("Optimal Lambda for Lasso Regression: ", best_lambda_lasso))
+
+
+lasso_model <- glmnet(x, y, alpha = 1, family = "binomial", lambda = best_lambda_lasso)
+
+```
+
+#### Predicting
+
+We will use a threshold of 0.5 to classify a success or not.
+
+```{r}
+lasso_probabilities <- predict(lasso_model, newx = x, type = "response")
+
+
+lasso_predictions <- ifelse(lasso_probabilities > 0.5, 1, 0)
+
+lasso_prediction_counts <- table(lasso_predictions)
+print(lasso_prediction_counts)
+
+```
+
+#### Evaluating the Model
+
+We will use a confusion matrix to evaluate the model accuracy.
+
+```{r}
+lasso_confusion_matrix <- table(Predicted = lasso_predictions, Actual = y)
+print(lasso_confusion_matrix)
+
+lasso_accuracy <- sum(lasso_predictions == y) / length(y)
+print(paste("Accuracy of Lasso Regression: ", round(lasso_accuracy * 100, 4), "%"))
+
+lasso_coefficients <- as.matrix(coef(lasso_model))
+print(lasso_coefficients)
+
+```
+
+Lasso regression automatically sets some coefficients to zero, removing less important predictors like budget if they do not significantly contribute to the model. By focusing on a smaller set of predictors, Lasso provides a more interpretable model. For example, it reveals that release_year, runtime, and popularity alone are sufficient to predict success. This helps filmmakers focus on the most influential factors, reducing unnecessary expenditures on less critical aspects to make a movie successful.
 
 ## Classifying Success with Logistic Regression:
 
@@ -562,21 +735,21 @@ print(predictions_lg_counts)
 ### Evaluating the model
 
 ```{r}
-#debug this part
-confusion_matrix_lg = table(Predicted_lg = predictions_lg, Actual = df_for_class$success)
+predictions_lg <- factor(predictions_lg, levels = c(0, 1), labels = c("No Success", "Success"))
+
+confusion_matrix_lg <- table(Predicted_lg = predictions_lg, Actual = df_for_class$success)
 print(confusion_matrix_lg)
 
-accuracy_lg = sum(predictions_lg == df_for_class$success) / length(predictions_lg)
-print(paste("Accuracy: ", accuracy_lg))
+accuracy_lg <- sum(predictions_lg == df_for_class$success) / length(predictions_lg)
+print(paste("Accuracy: ", round(accuracy_lg * 100, 4), "%"))
 
 ```
 
 The confusion matrix shows the distribution of correct and incorrect predictions. The accuracy percentage provides a measure of how well the model predicts movie success.
 
 ```{r}
+#dont think we need this code
 levels(df_for_class$success)
-
-# Check the unique values in the predicted outcomes
 unique(predictions_lg)
 ```
 
@@ -640,54 +813,11 @@ print(category_counts)
 table(Predicted = predicted_categories, Actual = df_for_class$budget_category)
 
 accuracy <- mean(predicted_categories == df_for_class$budget_category)
-cat("Accuracy:", accuracy)
+cat("Accuracy: ", round(accuracy * 100, 4), "%")
 
 ```
 
 # Classification with Emphasis on Interpretation
-
-## Classifying Success with LDA
-
-### Train the Model
-
-```{r}
-lda_model <- lda(success ~ budget + release_year + runtime + popularity, data = df_for_class)
-
-# View model coefficients and posterior probabilities
-print(lda_model)
-```
-
-### Predicting
-
-We will first predict success categories and then add the predictions to the dataset.
-
-```{r}
-predictions <- predict(lda_model, newdata = df_for_class)
-
-df_for_class$lda_predicted_success <- predictions$class
-```
-
-### Evaluating the Model
-
-We will use the confusion matrix and accuracy to evaluate the model.
-
-```{r}
-lda_confusion_matrix <- table(Predicted = predictions$class, Actual = df_for_class$success)
-
-lda_accuracy <- sum(predictions$class == df_for_class$success) / nrow(df_for_class)
-
-print(lda_confusion_matrix)
-cat("LDA Accuracy: ", round(lda_accuracy * 100, 2), "%\n")
-```
-
-### Visualizing Decision Boundaries
-
-```{r}
-ggplot(df_for_class, aes(x = budget, y = popularity, color = lda_predicted_success)) +
-  geom_point(alpha = 0.6) +
-  labs(title = "Decision Boundaries from LDA", x = "Budget", y = "Popularity") +
-  theme_minimal()
-```
 
 ## Classifying Success with Decision Trees
 
@@ -723,7 +853,7 @@ accuracy_tree <- sum(tree_predictions == df_for_class$success) / nrow(df_for_cla
 
 cat("Decision Tree Confusion Matrix:\n")
 print(tree_confusion)
-cat("Decision Tree Accuracy: ", round(accuracy_tree * 100, 2), "%\n")
+cat("Decision Tree Accuracy: ", round(accuracy_tree * 100, 4), "%\n")
 ```
 
 ## Classifying Success with Random Forest (with Feature Importance)
@@ -762,104 +892,106 @@ accuracy_rf <- sum(rf_predictions == df_for_class$success) / nrow(df_for_class)
 
 cat("Random Forest Confusion Matrix:\n")
 print(rf_confusion)
-cat("Random Forest Accuracy: ", round(accuracy_rf * 100, 2), "%\n")
+cat("Random Forest Accuracy: ", round(accuracy_rf * 100, 4), "%\n")
 
 ```
 
-## Classifying Success with Naive Bayes
+## Classifying Success with Neural Networks
 
-The probabilities for each class provide insight into model confidence.
+In the context of movie success classification, the neural network captures nonlinear relationships between features like budget and popularity interacting in unexpected ways.
 
-### Train the Model
+### Fit the Model
 
 ```{r}
-library(e1071)
+set.seed(123)
+df_for_class$success <- as.factor(df_for_class$success) 
+trainIndex <- createDataPartition(df_for_class$success, p = 0.8, list = FALSE)
+trainData <- df_for_class[trainIndex, ]
+testData <- df_for_class[-trainIndex, ]
 
-nb_model <- naiveBayes(success ~ budget + release_year + runtime + popularity, data = df_for_class)
+nn_model <- nnet(success ~ budget + release_year + runtime + popularity,
+                 data = trainData,
+                 size = 5, 
+                 decay = 0.01,  
+                 maxit = 500)  
+
+print(summary(nn_model))
 
 ```
 
 ### Prediction
 
 ```{r}
-nb_predictions <- predict(nb_model, newdata = df_for_class)
+nn_predictions <- predict(nn_model, newdata = testData, type = "class")
 ```
 
 ### Evaluating the Model
 
-Use a confusion matrix to evaluate the model.
+Use the confusion matrix to evaluate model accuracy.
 
 ```{r}
-nb_confusion <- table(Predicted = nb_predictions, Actual = df_for_class$success)
-accuracy_nb <- sum(nb_predictions == df_for_class$success) / nrow(df_for_class)
+confusion_matrix_nn <- table(Predicted = nn_predictions, Actual = testData$success)
+print(confusion_matrix_nn)
 
-cat("Naïve Bayes Confusion Matrix:\n")
-print(nb_confusion)
-cat("Naïve Bayes Accuracy: ", round(accuracy_nb * 100, 2), "%\n")
+accuracy_nn <- sum(diag(confusion_matrix_nn)) / sum(confusion_matrix_nn)
+print(paste("Accuracy: ", round(accuracy_nn * 100, 4), "%"))
 ```
 
-# Classifying with Gradient Boosting
+## Classifying with Gradient Boosting
+
+Gradient boosting combines multiple weak learners (decision trees) to create a strong predictive model.
+
+### Fit the Model
+
+We will use a bernoulli distribution since we are working with binary classification.
 
 ```{r}
-install.packages("xgboost")
-library(xgboost)
+df_for_class$success <- ifelse(df_for_class$success == "Success", 1, 0)
+
+set.seed(123)
+trainIndex <- createDataPartition(df_for_class$success, p = 0.8, list = FALSE)
+trainData <- df_for_class[trainIndex, ]
+testData <- df_for_class[-trainIndex, ]
+
+set.seed(123)
+gbm_model <- gbm(success ~ budget + release_year + runtime + popularity,
+                 data = trainData,
+                 distribution = "bernoulli", 
+                 n.trees = 500,  
+                 interaction.depth = 3,  
+                 shrinkage = 0.01,  
+                 cv.folds = 5)  
 ```
 
-# Defining target and training data
+### Prediction
+
+We will find the best number of decision trees to use for the probabilities using cross validation.
 
 ```{r}
-#debugg
-GB_training = df_for_class[, c("runtime", "popularity", "budget", "revenue")]
-GB_target = df_for_class$success
+best_iter <- gbm.perf(gbm_model, method = "cv")
 
-GB_target = as.numeric(factor(GB_target)) - 1  
-
-set.seed(123)  
-train_index = createDataPartition(success, p = 0.8, list = FALSE)  
-X_train = GB_training[train_index, ]
-y_train = GB_target[train_index]
-X_test = GB_training[-train_index, ]
-y_test = GB_target[-train_index]
-
-# Converting data to DMatrix (optimized format for xgboost)
-dtrain = xgb.DMatrix(data = as.matrix(X_train), label = y_train)
-dtest = xgb.DMatrix(data = as.matrix(X_test), label = y_test)
+gbm_probabilities <- predict(gbm_model, newdata = testData, n.trees = best_iter, type = "response")
+gbm_predictions <- ifelse(gbm_probabilities > 0.5, "Success", "No Success")
 ```
 
-```{r}
-# Setting hyperparameters 
-params = list(
-  objective = "binary:logistic",  
-  eval_metric = "logloss",  
-  max_depth = 6,  
-  eta = 0.1,  
-  nthread = 2,  
-  colsample_bytree = 0.8,  
-  subsample = 0.8  
-)
+### Evaluating the Model
 
-# Training xgboost model
-xgb_model = xgb.train(
-  params = params,
-  data = dtrain,
-  nrounds = 100,  
-  watchlist = list(train = dtrain, test = dtest),  
-  early_stopping_rounds = 10
-)
+Use the confusion matrix to evaluate the model accuracy.
+
+```{r}
+confusion_matrix_gbm <- table(Predicted = gbm_predictions, Actual = testData$success)
+print(confusion_matrix_gbm)
+
+accuracy_gbm <- sum(diag(confusion_matrix_gbm)) / sum(confusion_matrix_gbm)
+print(paste("Accuracy: ", round(accuracy_gbm * 100, 4), "%"))
 
 ```
 
-# Evaluating GB model
+### Feature Importance
 
 ```{r}
-y_pred = predict(xgb_model, dtest)
-
-y_pred_class = ifelse(y_pred > 0.5, 1, 0)
-
-# Calculating accuracy
-accuracy = mean(y_pred_class == y_test)
-cat("Test Accuracy: ", accuracy, "\n")
-
+importance <- summary(gbm_model)
+print(importance)
 ```
 
 **Prediction** using Logistic regression answers the question, "Can we predict success?"
