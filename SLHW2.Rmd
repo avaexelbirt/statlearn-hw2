@@ -31,6 +31,10 @@ library(rpart)
 library(rpart.plot)
 library(nnet)
 library(gbm)
+library(MASS)
+library(randomForest)
+library(pdp)
+library(fastshap)
 ```
 
 # About the Data
@@ -134,9 +138,15 @@ horror[char_cols] <- lapply(horror[char_cols], function(x) {
 
 We will remove the columns ids and paths as these are not needed for our overall analysis.
 
-```{r drop}
-horror <- horror %>%
-  select(-c(id, poster_path, backdrop_path, collection, collection_name))
+```{r}
+library(dplyr)
+
+# Drop the specified columns
+#horror <- horror |> select(-id, -poster_path, -backdrop_path, -collection, -collection_name)
+
+horror <- dplyr::select(horror, -id, -poster_path, -backdrop_path, -collection, -collection_name)
+
+
 ```
 
 ### Feature Engineering
@@ -463,10 +473,6 @@ ggplot(df_for_class, aes(x = release_year, y = popularity)) +
 
 ## Classifying Success with LDA:
 
-```{r}
-library(MASS)
-```
-
 ### Training the model
 
 ```{r}
@@ -496,7 +502,7 @@ df_for_class$lda_predicted_success <- predictions$class
 
 ```
 
-### Evaluating the Model 
+### Evaluating the Model
 
 We will use the confusion matrix and accuracy calculations to show the accuracy of the model.
 
@@ -732,7 +738,7 @@ print(predictions_lg_counts)
 
 ```
 
-### Evaluating the model
+### Evaluating the mode
 
 ```{r}
 predictions_lg <- factor(predictions_lg, levels = c(0, 1), labels = c("No Success", "Success"))
@@ -746,12 +752,6 @@ print(paste("Accuracy: ", round(accuracy_lg * 100, 4), "%"))
 ```
 
 The confusion matrix shows the distribution of correct and incorrect predictions. The accuracy percentage provides a measure of how well the model predicts movie success.
-
-```{r}
-#dont think we need this code
-levels(df_for_class$success)
-unique(predictions_lg)
-```
 
 ## Classifying Budget into four predicted groups with multinomial logistic regression:
 
@@ -1020,7 +1020,7 @@ Interpretation: (ADD with context)
 
 -   Avoid using highly correlated predictors simultaneously to prevent redundancy.
 
-### Feature Importance from Random Forest
+### Variable Importance from Random Forest
 
 Random Forest provides a direct measure of feature importance.
 
@@ -1035,6 +1035,52 @@ Interpretation: (ADD with context)
 
 -   Features with higher Mean Decrease Accuracy or Mean Decrease Gini should be prioritized.
 
+### Gradient Boosting Feature Importance and Partial Dependence
+
+#### Build Model
+
+```{r}
+gbm_model <- gbm(
+  success ~ budget + release_year + runtime + popularity, 
+  data = horror, 
+  distribution = "bernoulli", 
+  n.trees = 500, 
+  interaction.depth = 3, 
+  shrinkage = 0.01, 
+  cv.folds = 5
+)
+```
+
+#### Feature Importance and Plot
+
+```{r}
+importance_df_gbm <- data.frame(
+  Feature = summary(gbm_model)$var,
+  Importance = summary(gbm_model)$rel.inf
+)
+
+# Plot Feature Importances
+ggplot(importance_df_gbm, aes(x = reorder(Feature, Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "darkorange") +
+  coord_flip() +
+  ggtitle("Feature Importances from Gradient Boosting") +
+  xlab("") +
+  ylab("Relative Influence") +
+  theme_minimal()
+```
+
+#### Partial Dependence Plot
+
+```{r}
+# Partial Dependence Plot for 'runtime'
+pdp_runtime <- partial(gbm_model, pred.var = "runtime", n.trees = gbm.perf(gbm_model, method = "cv"))
+autoplot(pdp_runtime, rug = TRUE) +
+  ggtitle("Partial Dependence Plot for Runtime") +
+  xlab("Runtime") +
+  ylab("Predicted Probability of Success") +
+  theme_minimal()
+```
+
 ### Stepwise Selection
 
 We can use stepwise regression to identify the most relevant features for logistic regression.
@@ -1048,6 +1094,69 @@ summary(step_model)
 Interpretation: (ADD with context)
 
 -   Features retained in the final model are likely to be the most predictive.
+
+### SHAP Values for Model Interpretability
+
+#### SHAP Analysis with Random Forest 
+
+```{r}
+predict_function <- function(object, newdata) {
+  predict(object, newdata = newdata, type = "prob")[, "Success"]
+}
+
+# Explanatory dataset
+X <- horror[, c("budget", "release_year", "runtime", "popularity")]
+y <- horror$success
+
+```
+
+#### Compute SHAP Values + Mean Absolute SHAP Values
+
+```{r}
+set.seed(123)
+shap_values <- fastshap::explain(
+  object = rf_model,
+  X = X,
+  pred_wrapper = predict_function,
+  nsim = 50,
+  adjust = TRUE
+)
+
+# Mean Absolute SHAP values
+mean_abs_shap <- colMeans(abs(shap_values))
+shap_importance <- data.frame(
+  Feature = names(mean_abs_shap),
+  MeanAbsShap = mean_abs_shap
+)
+```
+
+#### SHAP Feature Importance Plot
+
+```{r}
+ggplot(shap_importance, aes(x = reorder(Feature, MeanAbsShap), y = MeanAbsShap)) +
+  geom_bar(stat = "identity", fill = "purple") +
+  coord_flip() +
+  ggtitle("SHAP Feature Importance for Random Forest") +
+  xlab("") +
+  ylab("Mean |SHAP Value|") +
+  theme_minimal()
+
+```
+
+#### SHAP Dependence Plot
+
+```{r}
+ggplot(data = data.frame(
+  SHAP_value = shap_values$budget,
+  Feature_value = X$budget
+), aes(x = Feature_value, y = SHAP_value)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "loess", se = FALSE, color = "blue") +
+  ggtitle("SHAP Dependence Plot for Budget") +
+  xlab("Budget") +
+  ylab("SHAP Value") +
+  theme_minimal()
+```
 
 ## Comparing Predictor Sets
 
