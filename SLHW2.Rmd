@@ -1037,20 +1037,6 @@ Interpretation: (ADD with context)
 
 ### Gradient Boosting Feature Importance and Partial Dependence
 
-#### Build Model
-
-```{r}
-gbm_model <- gbm(
-  success ~ budget + release_year + runtime + popularity, 
-  data = horror, 
-  distribution = "bernoulli", 
-  n.trees = 500, 
-  interaction.depth = 3, 
-  shrinkage = 0.01, 
-  cv.folds = 5
-)
-```
-
 #### Feature Importance and Plot
 
 ```{r}
@@ -1069,16 +1055,27 @@ ggplot(importance_df_gbm, aes(x = reorder(Feature, Importance), y = Importance))
   theme_minimal()
 ```
 
+ADD Interpretations
+
 #### Partial Dependence Plot
 
 ```{r}
-# Partial Dependence Plot for 'runtime'
-pdp_runtime <- partial(gbm_model, pred.var = "runtime", n.trees = gbm.perf(gbm_model, method = "cv"))
-autoplot(pdp_runtime, rug = TRUE) +
+# Assuming 'trainData' is your dataset used to train the 'gbm_model'
+
+# Generate the partial dependence plot for 'runtime'
+pdp_runtime <- partial(gbm_model, 
+                       pred.var = "runtime", 
+                       n.trees = gbm.perf(gbm_model, method = "cv"),
+                       train = trainData)  # Ensure the training data is passed
+
+# Plot Partial Dependence Plot with rug
+autoplot(pdp_runtime, rug = TRUE) + 
   ggtitle("Partial Dependence Plot for Runtime") +
   xlab("Runtime") +
   ylab("Predicted Probability of Success") +
   theme_minimal()
+
+
 ```
 
 ### Stepwise Selection
@@ -1113,10 +1110,18 @@ y <- horror$success
 #### Compute SHAP Values + Mean Absolute SHAP Values
 
 ```{r}
+# Convert 'success' to a factor if it's not already
+df_for_class$success <- factor(df_for_class$success, levels = c(0, 1), labels = c("No Success", "Success"))
+# Define the prediction function for SHAP
+predict_function <- function(object, newdata) {
+  predict(object, newdata = newdata, type = "prob")[, "Success"]  # Get probabilities for 'Success' class
+}
+
+# Compute SHAP values
 set.seed(123)
 shap_values <- fastshap::explain(
   object = rf_model,
-  X = X,
+  X = df_for_class[, c("budget", "release_year", "runtime", "popularity")],  # Use the feature columns
   pred_wrapper = predict_function,
   nsim = 50,
   adjust = TRUE
@@ -1158,6 +1163,40 @@ ggplot(data = data.frame(
   theme_minimal()
 ```
 
+### Multiple Regression with t-values for Variable Importance
+
+```{r}
+# View the summary of the model to check t-values and p-values
+summary(lm_model)
+
+# The t-values are listed in the "t value" column of the summary.
+# High t-values indicate important features, low t-values indicate less important features.
+```
+
+-   A **higher absolute t-value** (greater than 2 or less than -2) indicates that the predictor is more significant.
+
+-   A **low t-value** (near 0) suggests that the predictor doesn't contribute much to the model and may be removed.
+
+### Recursive Feature Elimination (RFE)
+
+```{r}
+# Define the control parameters for RFE
+ctrl <- rfeControl(functions = rfFuncs, method = "cv", number = 10)
+
+# Perform Recursive Feature Elimination using Random Forest as the model
+rfe_result <- rfe(df_for_class[, c("budget", "release_year", "runtime", "popularity")], 
+                  df_for_class$success, 
+                  sizes = c(1:4),  # Try selecting from 1 to 4 features
+                  rfeControl = ctrl)
+
+# View the results
+print(rfe_result)
+
+# Plot the results
+plot(rfe_result, type = c("g", "o"))
+
+```
+
 ## Comparing Predictor Sets
 
 ### Base Set of Predictors
@@ -1184,6 +1223,96 @@ reduced_probs <- predict(reduced_model, type = "response")
 reduced_preds <- ifelse(reduced_probs > 0.5, 1, 0)
 reduced_accuracy <- mean(reduced_preds == df_for_class$success)
 cat("Reduced Model Accuracy: ", reduced_accuracy, "\n")
+
+```
+
+### Comparing Models with Different Predictor Sets
+
+```{r}
+# Load necessary libraries
+library(randomForest)
+library(caret)
+library(ROCR)
+
+# Define the different predictor sets
+predictor_set_1 <- c("budget", "release_year", "runtime")
+predictor_set_2 <- c("budget", "release_year", "popularity")
+predictor_set_3 <- c("budget", "runtime", "popularity")
+predictor_set_4 <- c("budget", "release_year", "runtime", "popularity")
+
+# Define a function to train Random Forest and return performance metrics
+train_rf_model <- function(predictors, data) {
+  # Train Random Forest model
+  model <- randomForest(success ~ ., data = data[, c(predictors, "success")], ntree = 500)
+  
+  # Get predicted probabilities for the test data
+  prob <- predict(model, type = "prob")[,2]
+  
+  # Calculate AUC
+  pred <- prediction(prob, data$success)
+  perf <- performance(pred, measure = "auc")
+  auc <- perf@y.values[[1]]
+  
+  # Return AUC
+  return(auc)
+}
+
+# Define a function to train Multiple Linear Regression and return performance metrics
+train_lm_model <- function(predictors, data) {
+  # Train Linear Model
+  model <- lm(success ~ ., data = data[, c(predictors, "success")])
+  
+  # Get predicted probabilities
+  prob <- predict(model, type = "response")
+  
+  # Convert probabilities to class labels (Success = 1, No Success = 0)
+  pred_labels <- ifelse(prob > 0.5, 1, 0)
+  
+  # Calculate Accuracy
+  accuracy <- mean(pred_labels == data$success)
+  
+  # Return Accuracy
+  return(accuracy)
+}
+
+# Train and evaluate models with different predictor sets for Random Forest
+rf_auc_1 <- train_rf_model(predictor_set_1, df_for_class)
+rf_auc_2 <- train_rf_model(predictor_set_2, df_for_class)
+rf_auc_3 <- train_rf_model(predictor_set_3, df_for_class)
+rf_auc_4 <- train_rf_model(predictor_set_4, df_for_class)
+
+# Train and evaluate models with different predictor sets for Multiple Linear Regression
+lm_accuracy_1 <- train_lm_model(predictor_set_1, df_for_class)
+lm_accuracy_2 <- train_lm_model(predictor_set_2, df_for_class)
+lm_accuracy_3 <- train_lm_model(predictor_set_3, df_for_class)
+lm_accuracy_4 <- train_lm_model(predictor_set_4, df_for_class)
+
+# Create a summary of model performance
+performance_comparison <- data.frame(
+  Model = c("Random Forest (Set 1)", "Random Forest (Set 2)", "Random Forest (Set 3)", "Random Forest (Set 4)",
+            "Linear Regression (Set 1)", "Linear Regression (Set 2)", "Linear Regression (Set 3)", "Linear Regression (Set 4)"),
+  AUC_or_Accuracy = c(rf_auc_1, rf_auc_2, rf_auc_3, rf_auc_4, 
+                      lm_accuracy_1, lm_accuracy_2, lm_accuracy_3, lm_accuracy_4)
+)
+
+# Print performance comparison
+print(performance_comparison)
+
+```
+
+### Plotting Performance Comparison
+
+```{r}
+# Plot the comparison
+library(ggplot2)
+
+ggplot(performance_comparison, aes(x = Model, y = AUC_or_Accuracy, fill = Model)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  coord_flip() +
+  theme_minimal() +
+  ggtitle("Comparison of Model Performance across Different Predictor Sets") +
+  xlab("Model and Predictor Set") +
+  ylab("AUC (RF) / Accuracy (LM)")
 
 ```
 
