@@ -1,15 +1,17 @@
 ---
 title: "SLHW2"
 author: "Ava Exelbirt, Sam Reade"
-output: html_document
 date: "2024-12-01"
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r libraries}
+```{r}
 # Install necessary libraries if not installed
 # install.packages(c("ggplot2", "dplyr", "scales", "lubridate"))
 # install.packages("caret")
@@ -1059,7 +1061,7 @@ ADD Interpretations
 
 #### Partial Dependence Plot
 
-```{r}
+```{r, eval=FALSE}
 # Assuming 'trainData' is your dataset used to train the 'gbm_model'
 
 # Generate the partial dependence plot for 'runtime'
@@ -1082,7 +1084,7 @@ autoplot(pdp_runtime, rug = TRUE) +
 
 We can use stepwise regression to identify the most relevant features for logistic regression.
 
-```{r}
+```{r, eval=FALSE}
 full_model <- glm(success ~ budget + release_year + runtime + popularity, data = df_for_class, family = binomial)
 step_model <- stepAIC(full_model, direction = "both")
 summary(step_model)
@@ -1094,9 +1096,9 @@ Interpretation: (ADD with context)
 
 ### SHAP Values for Model Interpretability
 
-#### SHAP Analysis with Random Forest 
+#### SHAP Analysis with Random Forest
 
-```{r}
+```{r, eval=FALSE}
 predict_function <- function(object, newdata) {
   predict(object, newdata = newdata, type = "prob")[, "Success"]
 }
@@ -1109,7 +1111,7 @@ y <- horror$success
 
 #### Compute SHAP Values + Mean Absolute SHAP Values
 
-```{r}
+```{r, eval=FALSE}
 # Convert 'success' to a factor if it's not already
 df_for_class$success <- factor(df_for_class$success, levels = c(0, 1), labels = c("No Success", "Success"))
 # Define the prediction function for SHAP
@@ -1137,7 +1139,7 @@ shap_importance <- data.frame(
 
 #### SHAP Feature Importance Plot
 
-```{r}
+```{r, eval=FALSE}
 ggplot(shap_importance, aes(x = reorder(Feature, MeanAbsShap), y = MeanAbsShap)) +
   geom_bar(stat = "identity", fill = "purple") +
   coord_flip() +
@@ -1150,7 +1152,7 @@ ggplot(shap_importance, aes(x = reorder(Feature, MeanAbsShap), y = MeanAbsShap))
 
 #### SHAP Dependence Plot
 
-```{r}
+```{r, eval=FALSE}
 ggplot(data = data.frame(
   SHAP_value = shap_values$budget,
   Feature_value = X$budget
@@ -1165,7 +1167,7 @@ ggplot(data = data.frame(
 
 ### Multiple Regression with t-values for Variable Importance
 
-```{r}
+```{r, eval=FALSE}
 # View the summary of the model to check t-values and p-values
 summary(lm_model)
 
@@ -1179,7 +1181,7 @@ summary(lm_model)
 
 ### Recursive Feature Elimination (RFE)
 
-```{r}
+```{r, eval=FALSE}
 # Define the control parameters for RFE
 ctrl <- rfeControl(functions = rfFuncs, method = "cv", number = 10)
 
@@ -1203,7 +1205,7 @@ plot(rfe_result, type = c("g", "o"))
 
 We will use all available predictors: budget, release_year, runtime, and popularity.
 
-```{r}
+```{r, eval=FALSE}
 base_model <- glm(success ~ budget + release_year + runtime + popularity, data = df_for_class, family = binomial)
 base_probs <- predict(base_model, type = "response")
 base_preds <- ifelse(base_probs > 0.5, 1, 0)
@@ -1216,7 +1218,7 @@ cat("Base Model Accuracy: ", base_accuracy, "\n")
 
 We will now use only the most important predictors identifies through feature selection **(ADD WHEN FOUND ABOVE).**
 
-```{r}
+```{r, eval=FALSE}
 #EXAMPLE BUT CHANGE WHEN FIND PREDICTORS TO USE
 reduced_model <- glm(success ~ budget + popularity, data = df_for_class, family = binomial)
 reduced_probs <- predict(reduced_model, type = "response")
@@ -1228,7 +1230,7 @@ cat("Reduced Model Accuracy: ", reduced_accuracy, "\n")
 
 ### Comparing Models with Different Predictor Sets
 
-```{r}
+```{r, eval=FALSE}
 # Load necessary libraries
 library(randomForest)
 library(caret)
@@ -1302,7 +1304,7 @@ print(performance_comparison)
 
 ### Plotting Performance Comparison
 
-```{r}
+```{r, eval=FALSE}
 # Plot the comparison
 library(ggplot2)
 
@@ -1320,7 +1322,7 @@ ggplot(performance_comparison, aes(x = Model, y = AUC_or_Accuracy, fill = Model)
 
 We can test whether interaction terms improve model performance.
 
-```{r}
+```{r, eval=FALSE}
 interaction_model <- glm(success ~ budget * popularity + runtime, data = df_for_class, family = binomial)
 interaction_probs <- predict(interaction_model, type = "response")
 interaction_preds <- ifelse(interaction_probs > 0.5, 1, 0)
@@ -1333,7 +1335,7 @@ cat("Interaction Model Accuracy: ", interaction_accuracy, "\n")
 
 Use cross-validation to evaluate the generalizability of each predictor set.
 
-```{r}
+```{r, eval=FALSE}
 # Base Model
 base_cv <- train(success ~ budget + release_year + runtime + popularity, data = df_for_class, method = "glm", family = binomial, trControl = trainControl(method = "cv", number = 5))
 print(base_cv)
@@ -1349,12 +1351,12 @@ print(reduced_cv)
 
 Visualize the effect of individual predictors on the probability of success.
 
-```{r}
+```{r, eval=FALSE}
 install.packages("effects")
 library(effects)
 ```
 
-```{r}
+```{r, eval=FALSE}
 
 effect_plot <- allEffects(reduced_model)
 plot(effect_plot)
@@ -1364,19 +1366,19 @@ plot(effect_plot)
 
 Use this for tree based models like Random Forest.
 
-```{r}
+```{r, eval=FALSE}
 install.packages("pdp")
 library(pdp)
 ```
 
-```{r}
+```{r, eval=FALSE}
 # Partial dependence for "budget"
 pd_budget <- partial(rf_model, pred.var = "budget")
 plotPartial(pd_budget)
 
 ```
 
-```{r}
+```{r, eval=FALSE}
 pd_popularity <- partial(rf_model, pred.var = "popularity")
 plotPartial(pd_popularity)
 ```
