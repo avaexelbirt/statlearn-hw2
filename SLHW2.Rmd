@@ -439,8 +439,6 @@ ggplot(training, aes(x = success)) +
 4.  "predicting success categories (hit, average, flop) (QDA and LDA)
 5.  Predicting Budget using logistic regression
 
-
-
 # normalizing the data
 
 ```{r}
@@ -475,8 +473,6 @@ nrow(testing_n)
 
 summary(training_n)
 ```
-
-
 
 ## Visualizing the Relationships
 
@@ -558,7 +554,7 @@ print(paste("Accuracy: ", round(accuracy_lda * 100, 4), "%"))
 testing_n$lda_predicted_success <- lda_predictions
 
 library(ggplot2)
-ggplot(testData, aes(x = budget, y = popularity, color = lda_predicted_success)) +
+ggplot(testing_n, aes(x = budget, y = popularity, color = lda_predicted_success)) +
   geom_point(alpha = 0.6) +
   labs(title = "LDA Predictions: Success vs. No Success", x = "Budget", y = "Popularity") +
   theme_minimal()
@@ -648,10 +644,6 @@ Ridge regression reduces variance in the presence of highly correlated predictor
 #### Training the Model
 
 We will fit the Ridge model with cross-validation to find the optimal lambda. Then, we will use that best lambda to train the model.
-```{r}
-dim(x)  # Check the number of rows and columns in x
-length(y)
-```
 
 # Ridge Regression
 
@@ -890,7 +882,7 @@ tree_predictions <- predict(tree_model, newdata = testing, type = "class")
 
 ### Evaluating the Model
 
-Use the confusion matrix to evaluate the model. 
+Use the confusion matrix to evaluate the model.
 
 ```{r}
 tree_confusion <- table(Predicted = tree_predictions, Actual = testing$success)
@@ -963,12 +955,6 @@ nn_model <- nnet(success ~ budget + release_year + runtime + popularity,
 print(summary(nn_model))
 
 ```
-```{r}
-any(is.na(testData))
-length(nn_predictions)
-length(testData$success)
-
-```
 
 ### Prediction
 
@@ -1033,16 +1019,6 @@ accuracy_gbm <- sum(diag(confusion_matrix_gbm)) / sum(confusion_matrix_gbm)
 print(paste("Accuracy: ", round(accuracy_gbm * 100, 4), "%"))
 
 ```
-
-
-
-
-
-
-
-
-
-
 
 ### Feature Importance
 
