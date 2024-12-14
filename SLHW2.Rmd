@@ -18,6 +18,8 @@ knitr::opts_chunk$set(echo = TRUE)
 # install.packages("GGally")
 # install.packages("tidyverse")
 #install.packages("randomForest")
+# install.packages("gbm")
+# install.packages("fastshap")
 ```
 
 ```{r libraries}
@@ -334,6 +336,17 @@ sum(horror$budget == 0)
 sum(horror$budget != 0)
 ```
 
+# Making data frame with no 0s
+
+```{r}
+# Create a new data frame without rows where revenue and budget is 0
+df_for_class = subset(horror, revenue != 0 & budget != 0)
+df_for_class$success = as.factor(df_for_class$success)
+
+head(df_for_class)
+dim(df_for_class)
+```
+
 ## Split the Data
 
 ### Train and Test Data
@@ -343,9 +356,9 @@ We will split the data into training (60%) and testing (40%) sets. We will then 
 ```{r split}
 set.seed(123)
 
-in_train <- createDataPartition(horror$budget_category, p = 0.6, list = FALSE)
-training <- horror[in_train, ]
-testing <- horror[-in_train, ]
+in_train <- createDataPartition(df_for_class$budget_category, p = 0.6, list = FALSE)
+training <- df_for_class[in_train, ]
+testing <- df_for_class[-in_train, ]
 
 nrow(training)
 nrow(testing)
@@ -426,14 +439,44 @@ ggplot(training, aes(x = success)) +
 4.  "predicting success categories (hit, average, flop) (QDA and LDA)
 5.  Predicting Budget using logistic regression
 
-```{r}
-# Create a new data frame without rows where revenue is 0
-df_for_class = subset(horror, revenue != 0 & budget != 0)
-df_for_class$success = as.factor(df_for_class$success)
 
-head(df_for_class)
-dim(df_for_class)
+
+# normalizing the data
+
+```{r}
+# Columns to normalize
+columns_to_normalize <- c("budget", "release_year", "runtime", "popularity")
+
+# Min-max normalization function
+min_max_normalize <- function(x) {
+  (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
+}
+
+# Create a copy of the original data frame
+df_normal <- df_for_class
+
+# Normalize only the specified columns
+df_normal[columns_to_normalize] <- lapply(df_for_class[columns_to_normalize], min_max_normalize)
+
+# Check the structure to confirm normalization
+str(df_normal)
+
 ```
+
+# Splitting training and testing for normalized data
+
+```{r}
+in_train_n <- createDataPartition(df_normal$budget_category, p = 0.6, list = FALSE)
+training_n <- df_normal[in_train, ]
+testing_n <- df_normal[-in_train, ]
+
+nrow(training_n)
+nrow(testing_n)
+
+summary(training_n)
+```
+
+
 
 ## Visualizing the Relationships
 
@@ -478,7 +521,7 @@ ggplot(df_for_class, aes(x = release_year, y = popularity)) +
 ### Training the model
 
 ```{r}
-lda_model = lda(success ~ budget + release_year + runtime + popularity, data = df_for_class)
+lda_model <- lda(success ~ budget + release_year + runtime + popularity, data = training_n)
 
 lda_model
 
@@ -489,18 +532,10 @@ lda_model
 We will first predict success categories and then add the predictions to the LDA dataset for visualizing the predictions.
 
 ```{r}
-predictions_LDA = predict(lda_model, newdata = df_for_class)
+lda_predictions <- predict(lda_model, newdata = testing_n)$class
 
-predicted_classes_LDA = predictions_LDA$class
-
-predicted_probs_LDA = predictions_LDA$posterior
-
-predictions_LDA_counts = table(predicted_classes_LDA)
-print(predictions_LDA_counts)
-
-predictions <- predict(lda_model, newdata = df_for_class)
-
-df_for_class$lda_predicted_success <- predictions$class
+prediction_counts_lda <- table(lda_predictions)
+print(prediction_counts_lda)
 
 ```
 
@@ -509,21 +544,25 @@ df_for_class$lda_predicted_success <- predictions$class
 We will use the confusion matrix and accuracy calculations to show the accuracy of the model.
 
 ```{r}
-confusion_matrix_LDA = table(Predicted_LDA = predicted_classes_LDA, Actual = df_for_class$success)
-print(confusion_matrix_LDA)
+confusion_matrix_lda <- table(Predicted = lda_predictions, Actual = testing_n$success)
+print(confusion_matrix_lda)
 
-accuracy_LDA <- sum(predicted_classes_LDA == df_for_class$success) / nrow(df_for_class)
-print(paste("Accuracy:", round(accuracy_LDA * 100, 4), "%"))
+accuracy_lda <- sum(lda_predictions == testing_n$success) / length(lda_predictions)
+print(paste("Accuracy: ", round(accuracy_lda * 100, 4), "%"))
 
 ```
 
 ### Visualizing Decision Boundaries
 
 ```{r}
-ggplot(df_for_class, aes(x = budget, y = popularity, color = lda_predicted_success)) +
+testing_n$lda_predicted_success <- lda_predictions
+
+library(ggplot2)
+ggplot(testData, aes(x = budget, y = popularity, color = lda_predicted_success)) +
   geom_point(alpha = 0.6) +
-  labs(title = "Decision Boundaries from LDA", x = "Budget", y = "Popularity") +
+  labs(title = "LDA Predictions: Success vs. No Success", x = "Budget", y = "Popularity") +
   theme_minimal()
+
 ```
 
 ## Classifying Success with QDA
@@ -531,7 +570,7 @@ ggplot(df_for_class, aes(x = budget, y = popularity, color = lda_predicted_succe
 ### Training the model
 
 ```{r}
-qda_model = qda(success ~ budget + release_year + runtime + popularity, data = df_for_class)
+qda_model = qda(success ~ budget + release_year + runtime + popularity, data = training_n)
 
 qda_model
 ```
@@ -539,14 +578,11 @@ qda_model
 ### Predicting
 
 ```{r}
-predictions_QDA = predict(qda_model, newdata = df_for_class)
+qda_predictions = predict(qda_model, newdata = testing_n)$class
 
-predicted_classes_QDA = predictions_QDA$class
+prediction_counts_qda <- table(qda_predictions)
+print(prediction_counts_qda)
 
-predicted_probs_QDA = predictions_QDA$posterior
-
-predictions_QDA_counts = table(predicted_classes_QDA)
-print(predictions_QDA_counts)
 ```
 
 ### Evaluating the Model
@@ -554,11 +590,11 @@ print(predictions_QDA_counts)
 We will use the confusion matrix and accuracy calculations to show the accuracy of the model.
 
 ```{r}
-confusion_matrix_QDA = table(Predicted_QDA = predicted_classes_QDA, Actual = df_for_class$success)
-print(confusion_matrix_QDA)
+confusion_matrix_qda <- table(Predicted = qda_predictions, Actual = testing_n$success)
+print(confusion_matrix_qda)
 
-accuracy_QDA = sum(predicted_classes_QDA == df_for_class$success) / nrow(df_for_class)
-print(paste("Accuracy:", round(accuracy_QDA * 100, 4), "%"))
+accuracy_qda <- sum(qda_predictions == testing_n$success) / length(qda_predictions)
+print(paste("Accuracy: ", round(accuracy_qda * 100, 4), "%"))
 ```
 
 ## Classifying Success with Naive Bayes:
@@ -570,7 +606,7 @@ Naive Bayes is a probabilistic model based on Bayes' Theorem. The model assumes 
 ```{r}
 library(e1071)
 
-nb_model <- naiveBayes(success ~ budget + release_year + runtime + popularity, data = df_for_class)
+nb_model <- naiveBayes(success ~ budget + release_year + runtime + popularity, data = training)
 
 print(nb_model)
 
@@ -579,7 +615,7 @@ print(nb_model)
 ### Predicting
 
 ```{r}
-predictions_nb <- predict(nb_model, df_for_class)
+predictions_nb <- predict(nb_model, testing)
 
 predictions_nb_counts <- table(predictions_nb)
 print(predictions_nb_counts)
@@ -591,11 +627,11 @@ print(predictions_nb_counts)
 We will use a confusion matrix to show model accuracy.
 
 ```{r}
-confusion_matrix_nb <- table(Predicted_NB = predictions_nb, Actual = df_for_class$success)
+confusion_matrix_nb <- table(Predicted_NB = predictions_nb, Actual = testing$success)
 print(confusion_matrix_nb)
 
 
-accuracy_nb <- sum(predictions_nb == df_for_class$success) / nrow(df_for_class)
+accuracy_nb <- sum(predictions_nb == testing$success) / nrow(testing)
 print(paste("Accuracy: ", round(accuracy_nb *100, 4), "%"))
 
 
@@ -612,13 +648,18 @@ Ridge regression reduces variance in the presence of highly correlated predictor
 #### Training the Model
 
 We will fit the Ridge model with cross-validation to find the optimal lambda. Then, we will use that best lambda to train the model.
+```{r}
+dim(x)  # Check the number of rows and columns in x
+length(y)
+```
+
+# Ridge Regression
 
 ```{r}
-
 library(glmnet)
 
-x <- model.matrix(success ~ budget + release_year + runtime + popularity, data = df_for_class)[, -1]  
-y <- ifelse(df_for_class$success == "Success", 1, 0)  
+x <- model.matrix(success ~ budget + release_year + runtime + popularity, data = training_n)[, -1]  
+y <- ifelse(training_n$success == "Success", 1, 0)  
 
 set.seed(123) 
 ridge_cv <- cv.glmnet(x, y, alpha = 0, family = "binomial") 
@@ -720,35 +761,37 @@ Objective is to predict whether a movie is successful using logistic regression 
 ### Training the model
 
 ```{r}
-lg_model <- glm(success ~ budget + release_year + runtime + popularity, 
-                     data = df_for_class, 
-                     family = binomial)
+testing_lg = testing_n
+training_lg = training_n
 
-summary(lg_model)
+testing_lg$success <- ifelse(testing_lg$success == "Success", 1, 0)
+training_lg$success <- ifelse(training_lg$success == "Success", 1, 0)
+
+lg_model <- glm(success ~ budget + release_year + runtime + popularity,
+                data = training_lg, 
+                family = "binomial")
+
 
 ```
 
 ### Predicting:
 
 ```{r}
-probabilities_lg = predict(lg_model, newdata = df_for_class, type = "response")
+probabilities_lg <- predict(lg_model, newdata = testing_lg, type = "response")
 
-predictions_lg = ifelse(probabilities_lg > 0.5, 1, 0)
+predictions_lg <- ifelse(probabilities_lg > 0.5, 1, 0)
 
-predictions_lg_counts = table(predictions_lg)
-print(predictions_lg_counts)
-
+prediction_lg_counts <- table(predictions_lg)
+print(prediction_lg_counts)
 ```
 
 ### Evaluating the mode
 
 ```{r}
-predictions_lg <- factor(predictions_lg, levels = c(0, 1), labels = c("No Success", "Success"))
-
-confusion_matrix_lg <- table(Predicted_lg = predictions_lg, Actual = df_for_class$success)
+confusion_matrix_lg <- table(Predicted = predictions_lg, Actual = testing_lg$success)
 print(confusion_matrix_lg)
 
-accuracy_lg <- sum(predictions_lg == df_for_class$success) / length(predictions_lg)
+accuracy_lg <- sum(predictions_lg == testing_lg$success) / length(predictions_lg)
 print(paste("Accuracy: ", round(accuracy_lg * 100, 4), "%"))
 
 ```
@@ -765,7 +808,7 @@ library(nnet)
 ### Preparing target
 
 ```{r}
-budget_quartiles <- quantile(df_for_class$budget, probs = c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE)
+budget_quartiles <- quantile(training_n$budget, probs = c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE)
 budget_quartiles <- unique(budget_quartiles)  # Remove duplicate values
 
 if (length(budget_quartiles) - 1 != 4) {
@@ -773,23 +816,23 @@ if (length(budget_quartiles) - 1 != 4) {
 }
 
 # Assign budget categories
-df_for_class$budget_category <- cut(
-  df_for_class$budget, 
+training_n$budget_category <- cut(
+  training_n$budget, 
   breaks = budget_quartiles, 
   labels = c("Low", "Medium", "High", "Very High"), 
   include.lowest = TRUE
 )
 
-table(df_for_class$budget_category)
+table(training_n$budget_category)
 
 ```
 
 ### Fitting the model
 
 ```{r}
-df_for_class$budget_category <- as.factor(df_for_class$budget_category)
+training_n$budget_category <- as.factor(training_n$budget_category)
 
-multinom_model <- multinom(budget_category ~ revenue + release_year + popularity, data = df_for_class)
+multinom_model <- multinom(budget_category ~ revenue + release_year + popularity, data = training_n)
 ```
 
 ### Check the model summary
@@ -801,7 +844,7 @@ summary(multinom_model)
 ### Predict classifications
 
 ```{r}
-predicted_categories = predict(multinom_model, newdata = df_for_class)
+predicted_categories = predict(multinom_model, newdata = testing_n)
 
 category_counts = table(predicted_categories)
 print(category_counts)
@@ -812,9 +855,9 @@ print(category_counts)
 
 ```{r}
 
-table(Predicted = predicted_categories, Actual = df_for_class$budget_category)
+table(Predicted = predicted_categories, Actual = testing_n$budget_category)
 
-accuracy <- mean(predicted_categories == df_for_class$budget_category)
+accuracy <- mean(predicted_categories == testing_n$budget_category)
 cat("Accuracy: ", round(accuracy * 100, 4), "%")
 
 ```
@@ -828,7 +871,7 @@ The decision tree structure shows how features like budget and popularity split 
 ### Fit the Model
 
 ```{r}
-tree_model <- rpart(success ~ budget + release_year + runtime + popularity, data = df_for_class, method = "class")
+tree_model <- rpart(success ~ budget + release_year + runtime + popularity, data = training, method = "class")
 ```
 
 ### Visualize the Trees
@@ -842,20 +885,20 @@ rpart.plot(tree_model, type = 3, extra = 101, under = TRUE, fallen.leaves = TRUE
 ### Predicting
 
 ```{r}
-tree_predictions <- predict(tree_model, newdata = df_for_class, type = "class")
+tree_predictions <- predict(tree_model, newdata = testing, type = "class")
 ```
 
 ### Evaluating the Model
 
-Use the confusion matrix to evaluate the model.
+Use the confusion matrix to evaluate the model. 
 
 ```{r}
-tree_confusion <- table(Predicted = tree_predictions, Actual = df_for_class$success)
-accuracy_tree <- sum(tree_predictions == df_for_class$success) / nrow(df_for_class)
+tree_confusion <- table(Predicted = tree_predictions, Actual = testing$success)
+accuracy_tree <- sum(tree_predictions == testing$success) / nrow(testing)
 
 cat("Decision Tree Confusion Matrix:\n")
 print(tree_confusion)
-cat("Decision Tree Accuracy: ", round(accuracy_tree * 100, 4), "%\n")
+cat("Decision Tree Accuracy: ", round(accuracy_tree * 100, 4), "%\n") 
 ```
 
 ## Classifying Success with Random Forest (with Feature Importance)
@@ -865,7 +908,7 @@ cat("Decision Tree Accuracy: ", round(accuracy_tree * 100, 4), "%\n")
 ```{r}
 library(randomForest)
 
-rf_model <- randomForest(success ~ budget + release_year + runtime + popularity, data = df_for_class, importance = TRUE)
+rf_model <- randomForest(success ~ budget + release_year + runtime + popularity, data = training, importance = TRUE)
 
 ```
 
@@ -881,7 +924,7 @@ varImpPlot(rf_model)
 ### Prediction
 
 ```{r}
-rf_predictions <- predict(rf_model, newdata = df_for_class)
+rf_predictions <- predict(rf_model, newdata = testing)
 ```
 
 ### Evaluating the Model
@@ -889,8 +932,8 @@ rf_predictions <- predict(rf_model, newdata = df_for_class)
 Use a confusion matrix to evaluate the model.
 
 ```{r}
-rf_confusion <- table(Predicted = rf_predictions, Actual = df_for_class$success)
-accuracy_rf <- sum(rf_predictions == df_for_class$success) / nrow(df_for_class)
+rf_confusion <- table(Predicted = rf_predictions, Actual = testing$success)
+accuracy_rf <- sum(rf_predictions == testing$success) / nrow(testing)
 
 cat("Random Forest Confusion Matrix:\n")
 print(rf_confusion)
@@ -906,10 +949,10 @@ In the context of movie success classification, the neural network captures nonl
 
 ```{r}
 set.seed(123)
-df_for_class$success <- as.factor(df_for_class$success) 
-trainIndex <- createDataPartition(df_for_class$success, p = 0.8, list = FALSE)
-trainData <- df_for_class[trainIndex, ]
-testData <- df_for_class[-trainIndex, ]
+df_normal$success <- as.factor(df_normal$success) 
+trainIndex <- createDataPartition(df_normal$success, p = 0.8, list = FALSE)
+trainData <- df_normal[trainIndex, ]
+testData <- df_normal[-trainIndex, ]
 
 nn_model <- nnet(success ~ budget + release_year + runtime + popularity,
                  data = trainData,
@@ -918,6 +961,12 @@ nn_model <- nnet(success ~ budget + release_year + runtime + popularity,
                  maxit = 500)  
 
 print(summary(nn_model))
+
+```
+```{r}
+any(is.na(testData))
+length(nn_predictions)
+length(testData$success)
 
 ```
 
@@ -937,6 +986,7 @@ print(confusion_matrix_nn)
 
 accuracy_nn <- sum(diag(confusion_matrix_nn)) / sum(confusion_matrix_nn)
 print(paste("Accuracy: ", round(accuracy_nn * 100, 4), "%"))
+
 ```
 
 ## Classifying with Gradient Boosting
@@ -948,16 +998,11 @@ Gradient boosting combines multiple weak learners (decision trees) to create a s
 We will use a bernoulli distribution since we are working with binary classification.
 
 ```{r}
-df_for_class$success <- ifelse(df_for_class$success == "Success", 1, 0)
-
-set.seed(123)
-trainIndex <- createDataPartition(df_for_class$success, p = 0.8, list = FALSE)
-trainData <- df_for_class[trainIndex, ]
-testData <- df_for_class[-trainIndex, ]
+training$success <- ifelse(training$success == "Success", 1, 0)
 
 set.seed(123)
 gbm_model <- gbm(success ~ budget + release_year + runtime + popularity,
-                 data = trainData,
+                 data = training,
                  distribution = "bernoulli", 
                  n.trees = 500,  
                  interaction.depth = 3,  
@@ -972,7 +1017,7 @@ We will find the best number of decision trees to use for the probabilities usin
 ```{r}
 best_iter <- gbm.perf(gbm_model, method = "cv")
 
-gbm_probabilities <- predict(gbm_model, newdata = testData, n.trees = best_iter, type = "response")
+gbm_probabilities <- predict(gbm_model, newdata = testing, n.trees = best_iter, type = "response")
 gbm_predictions <- ifelse(gbm_probabilities > 0.5, "Success", "No Success")
 ```
 
@@ -981,13 +1026,23 @@ gbm_predictions <- ifelse(gbm_probabilities > 0.5, "Success", "No Success")
 Use the confusion matrix to evaluate the model accuracy.
 
 ```{r}
-confusion_matrix_gbm <- table(Predicted = gbm_predictions, Actual = testData$success)
+confusion_matrix_gbm <- table(Predicted = gbm_predictions, Actual = testing$success)
 print(confusion_matrix_gbm)
 
 accuracy_gbm <- sum(diag(confusion_matrix_gbm)) / sum(confusion_matrix_gbm)
 print(paste("Accuracy: ", round(accuracy_gbm * 100, 4), "%"))
 
 ```
+
+
+
+
+
+
+
+
+
+
 
 ### Feature Importance
 
