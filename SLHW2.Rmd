@@ -197,145 +197,6 @@ horror$success <- ifelse(horror$profit > 0, "Success", "No Success")
 
 ```
 
-### Correlation Analysis
-
-```{r corr}
-ggcorr(horror[ , sapply(horror, is.numeric)], label = TRUE)
-```
-
-## Visualization Tools
-
-### Distribution of Numeric Features
-
-We will plot the distributions of numeric features, specifically budget, revenue, and runtime.
-
-```{r num-dist}
-ggplot(horror, aes(x = budget)) +
-  geom_histogram(binwidth = 1e7, fill = "blue", color = "black", alpha = 0.7) +
-  labs(title = "Distribution of Budget", x = "Budget", y = "Count") +
-  theme_minimal()
-
-ggplot(horror, aes(x = revenue)) +
-  geom_histogram(binwidth = 1e7, fill = "green", color = "black", alpha = 0.7) +
-  labs(title = "Distribution of Revenue", x = "Revenue", y = "Count") +
-  theme_minimal()
-
-ggplot(horror, aes(x = runtime)) +
-  geom_histogram(binwidth = 10, fill = "red", color = "black", alpha = 0.7) +
-  labs(title = "Distribution of Runtime", x = "Runtime (Minutes)", y = "Count") +
-  theme_minimal()
-```
-
-```{r}
-# For Budget (which has large values)
-ggplot(horror, aes(x = budget)) +
-  geom_histogram(binwidth = 1e8, fill = "blue", color = "black", alpha = 0.7) +  # Increase binwidth
-  labs(title = "Distribution of Budget", x = "Budget", y = "Count") +
-  theme_minimal()
-
-# For Revenue (which also has large values)
-ggplot(horror, aes(x = revenue)) +
-  geom_histogram(binwidth = 1e8, fill = "green", color = "black", alpha = 0.7) +  # Increase binwidth
-  labs(title = "Distribution of Revenue", x = "Revenue", y = "Count") +
-  theme_minimal()
-
-# For Runtime (which typically has smaller values)
-ggplot(horror, aes(x = runtime)) +
-  geom_histogram(binwidth = 5, fill = "red", color = "black", alpha = 0.7) +  # Adjust binwidth for runtime
-  labs(title = "Distribution of Runtime", x = "Runtime (Minutes)", y = "Count") +
-  theme_minimal()
-
-```
-
-Budget and revenue are both right skewed and unimodal. Runtime is also right skewed, but bimodal.
-
-### Distribution of Some Categorical Features
-
-We will plot the distributions of some categorical features, specifically release_year and budget_category.
-
-```{r cat-dist}
-ggplot(horror, aes(x = release_year)) +
-  geom_bar(fill = "purple", color = "black") +
-  labs(title = "Distribution of Movies by Release Year", x = "Release Year", y = "Count") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
-ggplot(horror, aes(x = budget_category, fill = budget_category)) +
-  geom_bar() +
-  labs(title = "Distribution of Movies by Budget Category", x = "Budget Category", y = "Count") +
-  theme_minimal() +
-  theme(legend.position = "none")
-
-```
-
-Release year is left skewed and unimodal.
-
-### Distribution of Target Variable
-
-We will now look at the distribution of our target variable, show_or_movie.
-
-###CHANGE WITH NEW PREDICTOR
-
-```{r}
-sum(horror$success == "Success")
-sum(horror$success == "No Success")
-```
-
-```{r horrordist}
-ggplot(horror, aes(x = success)) + 
-  geom_bar(fill = "lightblue", color = "black") + 
-  labs(title = "Distribution of Success of a Movie", x = "Success", y = "Count") + 
-  theme_minimal()
-```
-
-### Variable Relationships
-
-We first examine the relationship between budget and revenue for each horror movie, with points colored by their budget category, helping to identify patterns and outliers in how budget impacts revenue. We can also visualize how the budget has evolved over the years by plotting release_year versus budget. We then examine the relationship between `popularity` and `vote_average` to see if there's a trend in how movies' popularity correlates with their ratings. We also examine the relationship between `budget` and `profit`. Each point represents a movie, and the color differentiates between successful and non-successful movies. The idea is to see if movies with higher budgets tend to generate more profit. Finally we show how the `profit` distribution differs between successful and non-successful movies. This boxplot shows the distribution of `profit` for movies categorized as "Success" or "No Success". The plot helps visualize how profits are distributed across these categories, revealing if successful movies tend to have higher profits.
-
-```{r}
-ggplot(horror, aes(x = budget, y = revenue)) +
-  geom_point(aes(color = budget_category), alpha = 0.7) +
-  scale_x_continuous(labels = scales::comma) +
-  scale_y_continuous(labels = scales::comma) +
-  labs(title = "Budget vs Revenue", x = "Budget", y = "Revenue") +
-  theme_minimal() +
-  theme(legend.title = element_blank())
-
-ggplot(horror, aes(x = release_year, y = budget)) +
-  geom_point(aes(color = budget_category), alpha = 0.7) +
-  scale_x_continuous(labels = scales::comma) +
-  scale_y_continuous(labels = scales::comma) +
-  labs(title = "Release Year vs")
-
-ggplot(horror, aes(x = popularity, y = vote_average)) +
-  geom_point(aes(color = genre_names), alpha = 0.7) +
-  scale_x_continuous(labels = scales::comma) +
-  labs(title = "Popularity vs Vote Average", x = "Popularity", y = "Vote Average") +
-  theme_minimal() +
-  theme(legend.position = "none")
-
-ggplot(horror, aes(x = budget, y = profit)) + 
-  geom_point(aes(color = success), alpha = 0.6) + 
-  scale_x_continuous(labels = scales::comma) + 
-  scale_y_continuous(labels = scales::comma) + 
-  labs(title = "Budget vs. Profit", x = "Budget", y = "Profit") + 
-  theme_minimal() + 
-  theme(legend.title = element_blank())
-
-ggplot(horror, aes(x = success, y = profit, fill = success)) + 
-  geom_boxplot() + 
-  scale_y_continuous(labels = scales::comma) + 
-  labs(title = "Profit Distribution by Success", x = "Success", y = "Profit") + 
-  theme_minimal() + 
-  theme(legend.title = element_blank())
-
-```
-
-```{r}
-sum(horror$budget == 0)
-sum(horror$budget != 0)
-```
-
 # Making data frame with no 0s
 
 ```{r}
@@ -372,7 +233,145 @@ summary(training)
 table(training$success) / length(training$success)
 ```
 
-4% successful movies,  96% unsuccessful movies: unbalanced dataset
+
+### Correlation Analysis
+
+```{r corr}
+ggcorr(df_for_class[ , sapply(df_for_class, is.numeric)], label = TRUE)
+```
+
+## Visualization Tools
+
+### Distribution of Numeric Features
+
+We will plot the distributions of numeric features, specifically budget, revenue, and runtime.
+
+```{r num-dist}
+ggplot(df_for_class, aes(x = budget)) +
+  geom_histogram(binwidth = 1e7, fill = "blue", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Budget", x = "Budget", y = "Count") +
+  theme_minimal()
+
+ggplot(df_for_class, aes(x = revenue)) +
+  geom_histogram(binwidth = 1e7, fill = "green", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Revenue", x = "Revenue", y = "Count") +
+  theme_minimal()
+
+ggplot(df_for_class, aes(x = runtime)) +
+  geom_histogram(binwidth = 10, fill = "red", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Runtime", x = "Runtime (Minutes)", y = "Count") +
+  theme_minimal()
+```
+
+```{r}
+# For Budget (which has large values)
+ggplot(df_for_class, aes(x = budget)) +
+  geom_histogram(binwidth = 1e7, fill = "blue", color = "black", alpha = 0.7) +  # Increase binwidth
+  labs(title = "Distribution of Budget", x = "Budget", y = "Count") +
+  theme_minimal()
+
+# For Revenue (which also has large values)
+ggplot(df_for_class, aes(x = revenue)) +
+  geom_histogram(binwidth = 1e8, fill = "green", color = "black", alpha = 0.7) +  # Increase binwidth
+  labs(title = "Distribution of Revenue", x = "Revenue", y = "Count") +
+  theme_minimal()
+
+# For Runtime (which typically has smaller values)
+ggplot(df_for_class, aes(x = runtime)) +
+  geom_histogram(binwidth = 5, fill = "red", color = "black", alpha = 0.7) +  # Adjust binwidth for runtime
+  labs(title = "Distribution of Runtime", x = "Runtime (Minutes)", y = "Count") +
+  theme_minimal()
+
+```
+
+Budget and revenue are both right skewed and unimodal. Runtime is also right skewed, but bimodal.
+
+### Distribution of Some Categorical Features
+
+We will plot the distributions of some categorical features, specifically release_year and budget_category.
+
+```{r cat-dist}
+ggplot(df_for_class, aes(x = release_year)) +
+  geom_bar(fill = "purple", color = "black") +
+  labs(title = "Distribution of Movies by Release Year", x = "Release Year", y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(df_for_class, aes(x = budget_category, fill = budget_category)) +
+  geom_bar() +
+  labs(title = "Distribution of Movies by Budget Category", x = "Budget Category", y = "Count") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+```
+
+Release year is left skewed and unimodal.
+
+### Distribution of Target Variable
+
+We will now look at the distribution of our target variable, show_or_movie.
+
+###CHANGE WITH NEW PREDICTOR
+
+```{r}
+sum(df_for_class$success == "Success")
+sum(df_for_class$success == "No Success")
+```
+
+66.7% successful movies, 33.3% unsuccessful movies: unbalanced dataset
+
+```{r horrordist}
+ggplot(df_for_class, aes(x = success)) + 
+  geom_bar(fill = "lightblue", color = "black") + 
+  labs(title = "Distribution of Success of a Movie", x = "Success", y = "Count") + 
+  theme_minimal()
+```
+
+### Variable Relationships
+
+We first examine the relationship between budget and revenue for each horror movie, with points colored by their budget category, helping to identify patterns and outliers in how budget impacts revenue. We can also visualize how the budget has evolved over the years by plotting release_year versus budget. We then examine the relationship between `popularity` and `vote_average` to see if there's a trend in how movies' popularity correlates with their ratings. We also examine the relationship between `budget` and `profit`. Each point represents a movie, and the color differentiates between successful and non-successful movies. The idea is to see if movies with higher budgets tend to generate more profit. Finally we show how the `profit` distribution differs between successful and non-successful movies. This boxplot shows the distribution of `profit` for movies categorized as "Success" or "No Success". The plot helps visualize how profits are distributed across these categories, revealing if successful movies tend to have higher profits.
+
+```{r}
+ggplot(df_for_class, aes(x = budget, y = revenue)) +
+  geom_point(aes(color = budget_category), alpha = 0.7) +
+  scale_x_continuous(labels = scales::comma) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title = "Budget vs Revenue", x = "Budget", y = "Revenue") +
+  theme_minimal() +
+  theme(legend.title = element_blank())
+
+ggplot(df_for_class, aes(x = release_year, y = budget)) +
+  geom_point(aes(color = budget_category), alpha = 0.7) +
+  scale_x_continuous(labels = scales::comma) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title = "Release Year vs")
+
+ggplot(df_for_class, aes(x = popularity, y = vote_average)) +
+  geom_point(aes(color = genre_names), alpha = 0.7) +
+  scale_x_continuous(labels = scales::comma) +
+  labs(title = "Popularity vs Vote Average", x = "Popularity", y = "Vote Average") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+ggplot(df_for_class, aes(x = budget, y = profit)) + 
+  geom_point(aes(color = success), alpha = 0.6) + 
+  scale_x_continuous(labels = scales::comma) + 
+  scale_y_continuous(labels = scales::comma) + 
+  labs(title = "Budget vs. Profit", x = "Budget", y = "Profit") + 
+  theme_minimal() + 
+  theme(legend.title = element_blank())
+
+ggplot(df_for_class, aes(x = success, y = profit, fill = success)) + 
+  geom_boxplot() + 
+  scale_y_continuous(labels = scales::comma) + 
+  labs(title = "Profit Distribution by Success", x = "Success", y = "Profit") + 
+  theme_minimal() + 
+  theme(legend.title = element_blank())
+
+```
+
+
+
 
 ### Training Visuals
 
@@ -560,10 +559,21 @@ ggplot(testing_n, aes(x = budget, y = popularity, color = lda_predicted_success)
   theme_minimal()
 
 ```
+# PDP 
+
+```{r}
+pdp_budget_lda <- pdp::partial(lda_model, pred.var = "popularity")
+
+ggplot(pdp_budget_lda, aes(x = popularity, y = yhat)) + 
+  geom_line() +
+  ggtitle("Partial Dependence of Success on popularity") +
+  xlab("popularity") +
+  ylab("Predicted Probability of Success") 
+```
 
 ## Classifying Success with QDA
 
-### Training the model
+### Training the model 
 
 ```{r}
 qda_model = qda(success ~ budget + release_year + runtime + popularity, data = training_n)
@@ -777,7 +787,7 @@ prediction_lg_counts <- table(predictions_lg)
 print(prediction_lg_counts)
 ```
 
-### Evaluating the mode
+### Evaluating the model
 
 ```{r}
 confusion_matrix_lg <- table(Predicted = predictions_lg, Actual = testing_lg$success)
@@ -789,6 +799,20 @@ print(paste("Accuracy: ", round(accuracy_lg * 100, 4), "%"))
 ```
 
 The confusion matrix shows the distribution of correct and incorrect predictions. The accuracy percentage provides a measure of how well the model predicts movie success.
+
+
+# PDP for Popularity
+
+```{r}
+pdp_budget_lg <- pdp::partial(lg_model, pred.var = "popularity")
+
+ggplot(pdp_budget_lg, aes(x = popularity, y = yhat)) +
+  geom_line() +
+  ggtitle("Partial Dependence of Success on popularity (Logistic Regression)") +
+  xlab("popularity") +
+  ylab("Predicted Probability of Success")
+```
+
 
 ## Classifying Budget into four predicted groups with multinomial logistic regression:
 
