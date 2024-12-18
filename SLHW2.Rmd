@@ -560,15 +560,104 @@ ggplot(testing_n, aes(x = budget, y = popularity, color = lda_predicted_success)
 
 ```
 # PDP 
-
 ```{r}
-pdp_budget_lda <- pdp::partial(lda_model, pred.var = "popularity")
 
-ggplot(pdp_budget_lda, aes(x = popularity, y = yhat)) + 
+budget_range <- seq(from = min(training_n$budget, na.rm = TRUE), 
+                    to = max(training_n$budget, na.rm = TRUE), 
+                    length.out = 100)
+
+pdp_data <- data.frame(
+  budget = budget_range,
+  release_year = rep(mean(training_n$release_year, na.rm = TRUE), 100),
+  runtime = rep(mean(training_n$runtime, na.rm = TRUE), 100),
+  popularity = rep(mean(training_n$popularity, na.rm = TRUE), 100)
+)
+
+pred_probs <- predict(lda_model, newdata = pdp_data, type = "response")$posterior[,2]
+
+pdp_data$success_probability <- pred_probs
+
+ggplot(pdp_data, aes(x = budget, y = success_probability)) +
   geom_line() +
-  ggtitle("Partial Dependence of Success on popularity") +
-  xlab("popularity") +
-  ylab("Predicted Probability of Success") 
+  labs(title = "Partial Dependence of Success on Budget (LDA)",
+       x = "Budget",
+       y = "Probability of Success") +
+  theme_minimal()
+
+
+
+
+pop_range <- seq(from = min(training_n$popularity, na.rm = TRUE), 
+                    to = max(training_n$popularity, na.rm = TRUE), 
+                    length.out = 100)
+
+pdp_data2 <- data.frame(
+  popularity = pop_range,
+  release_year = rep(mean(training_n$release_year, na.rm = TRUE), 100),
+  runtime = rep(mean(training_n$runtime, na.rm = TRUE), 100),
+  budget = rep(mean(training_n$budget, na.rm = TRUE), 100)
+)
+
+pred_probs2 <- predict(lda_model, newdata = pdp_data2, type = "response")$posterior[,2]
+
+pdp_data2$success_probability <- pred_probs2
+
+ggplot(pdp_data2, aes(x = popularity, y = success_probability)) +
+  geom_line() +
+  labs(title = "Partial Dependence of Success on popularity (LDA)",
+       x = "popularity",
+       y = "Probability of Success") +
+  theme_minimal()
+
+
+rt_range <- seq(from = min(training_n$runtime, na.rm = TRUE), 
+                    to = max(training_n$runtime, na.rm = TRUE), 
+                    length.out = 100)
+
+pdp_data3 <- data.frame(
+  runtime = rt_range,
+  release_year = rep(mean(training_n$release_year, na.rm = TRUE), 100),
+  popularity = rep(mean(training_n$popularity, na.rm = TRUE), 100),
+  budget = rep(mean(training_n$budget, na.rm = TRUE), 100)
+)
+
+pred_probs3 <- predict(lda_model, newdata = pdp_data3, type = "response")$posterior[,2]
+
+pdp_data3$success_probability <- pred_probs3
+
+ggplot(pdp_data3, aes(x = runtime, y = success_probability)) +
+  geom_line() +
+  labs(title = "Partial Dependence of Success on runtime (LDA)",
+       x = "runtime",
+       y = "Probability of Success") +
+  theme_minimal()
+
+
+ry_range <- seq(from = min(training_n$release_year, na.rm = TRUE), 
+                    to = max(training_n$release_year, na.rm = TRUE), 
+                    length.out = 100)
+
+pdp_data4 <- data.frame(
+  release_year = ry_range,
+  runtime = rep(mean(training_n$runtime, na.rm = TRUE), 100),
+  popularity = rep(mean(training_n$popularity, na.rm = TRUE), 100),
+  budget = rep(mean(training_n$budget, na.rm = TRUE), 100)
+)
+
+pred_probs4 <- predict(lda_model, newdata = pdp_data4, type = "response")$posterior[,2]
+
+pdp_data4$success_probability <- pred_probs4
+
+ggplot(pdp_data4, aes(x = release_year, y = success_probability)) +
+  geom_line() +
+  labs(title = "Partial Dependence of Success on release year (LDA)",
+       x = "release year",
+       y = "Probability of Success") +
+  theme_minimal()
+
+
+
+
 ```
 
 ## Classifying Success with QDA
@@ -602,6 +691,103 @@ print(confusion_matrix_qda)
 accuracy_qda <- sum(qda_predictions == testing_n$success) / length(qda_predictions)
 print(paste("Accuracy: ", round(accuracy_qda * 100, 4), "%"))
 ```
+# PDP 
+
+```{r}
+budget_range_qda <- seq(from = min(training_n$budget, na.rm = TRUE), 
+                    to = max(training_n$budget, na.rm = TRUE), 
+                    length.out = 100)
+
+pdp_data_qda <- data.frame(
+  budget = budget_range_qda,
+  release_year = rep(mean(training_n$release_year, na.rm = TRUE), 100),
+  runtime = rep(mean(training_n$runtime, na.rm = TRUE), 100),
+  popularity = rep(mean(training_n$popularity, na.rm = TRUE), 100)
+)
+
+pred_probs_qda <- predict(qda_model, newdata = pdp_data_qda, type = "response")$posterior[,2]
+
+pdp_data_qda$success_probability <- pred_probs_qda
+
+ggplot(pdp_data_qda, aes(x = budget, y = success_probability)) +
+  geom_line() +
+  labs(title = "Partial Dependence of Success on Budget (qda)",
+       x = "Budget",
+       y = "Probability of Success") +
+  theme_minimal()
+
+
+pop_range_qda <- seq(from = min(training_n$popularity, na.rm = TRUE), 
+                    to = max(training_n$popularity, na.rm = TRUE), 
+                    length.out = 100)
+
+pdp_data2_qda <- data.frame(
+  popularity = pop_range_qda,
+  release_year = rep(mean(training_n$release_year, na.rm = TRUE), 100),
+  runtime = rep(mean(training_n$runtime, na.rm = TRUE), 100),
+  budget = rep(mean(training_n$budget, na.rm = TRUE), 100)
+)
+
+pred_probs2_qda <- predict(qda_model, newdata = pdp_data2_qda, type = "response")$posterior[,2]
+
+pdp_data2_qda$success_probability <- pred_probs2_qda
+
+ggplot(pdp_data2_qda, aes(x = popularity, y = success_probability)) +
+  geom_line() +
+  labs(title = "Partial Dependence of Success on popularity (qda)",
+       x = "popularity",
+       y = "Probability of Success") +
+  theme_minimal()
+
+
+rt_range_qda <- seq(from = min(training_n$runtime, na.rm = TRUE), 
+                    to = max(training_n$runtime, na.rm = TRUE), 
+                    length.out = 100)
+
+pdp_data3_qda <- data.frame(
+  runtime = rt_range_qda,
+  release_year = rep(mean(training_n$release_year, na.rm = TRUE), 100),
+  popularity = rep(mean(training_n$popularity, na.rm = TRUE), 100),
+  budget = rep(mean(training_n$budget, na.rm = TRUE), 100)
+)
+
+pred_probs3_qda <- predict(qda_model, newdata = pdp_data3_qda, type = "response")$posterior[,2]
+
+pdp_data3_qda$success_probability <- pred_probs3_qda
+
+ggplot(pdp_data3_qda, aes(x = runtime, y = success_probability)) +
+  geom_line() +
+  labs(title = "Partial Dependence of Success on runtime (qda)",
+       x = "runtime",
+       y = "Probability of Success") +
+  theme_minimal()
+
+
+ry_range_qda <- seq(from = min(training_n$release_year, na.rm = TRUE), 
+                    to = max(training_n$release_year, na.rm = TRUE), 
+                    length.out = 100)
+
+pdp_data4_qda <- data.frame(
+  release_year = ry_range_qda,
+  runtime = rep(mean(training_n$runtime, na.rm = TRUE), 100),
+  popularity = rep(mean(training_n$popularity, na.rm = TRUE), 100),
+  budget = rep(mean(training_n$budget, na.rm = TRUE), 100)
+)
+
+pred_probs4_qda <- predict(qda_model, newdata = pdp_data4, type = "response")$posterior[,2]
+
+pdp_data4_qda$success_probability <- pred_probs4_qda
+
+ggplot(pdp_data4_qda, aes(x = release_year, y = success_probability)) +
+  geom_line() +
+  labs(title = "Partial Dependence of Success on release year (qda)",
+       x = "release year",
+       y = "Probability of Success") +
+  theme_minimal()
+```
+
+
+
 
 ## Classifying Success with Naive Bayes:
 
@@ -642,6 +828,111 @@ print(paste("Accuracy: ", round(accuracy_nb *100, 4), "%"))
 
 
 ```
+# PDP 
+
+```{r}
+budget_range_nb <- seq(from = min(training_n$budget, na.rm = TRUE), 
+                    to = max(training_n$budget, na.rm = TRUE), 
+                    length.out = 100)
+
+pdp_data_nb <- data.frame(
+  budget = budget_range_nb,
+  release_year = rep(mean(training_n$release_year, na.rm = TRUE), 100),
+  runtime = rep(mean(training_n$runtime, na.rm = TRUE), 100),
+  popularity = rep(mean(training_n$popularity, na.rm = TRUE), 100)
+)
+
+pred_probs_nb <- predict(nb_model, newdata = pdp_data_nb, type = "raw")
+
+success_probability <- pred_probs_nb[, 2]
+
+pdp_data_nb$success_probability <- success_probability
+
+ggplot(pdp_data_nb, aes(x = budget, y = success_probability)) +
+  geom_line() +
+  labs(title = "Partial Dependence of Success on Budget (nb)",
+       x = "Budget",
+       y = "Probability of Success") +
+  theme_minimal()
+
+
+
+pop_range_nb <- seq(from = min(training_n$popularity, na.rm = TRUE), 
+                    to = max(training_n$popularity, na.rm = TRUE), 
+                    length.out = 100)
+
+pdp_data2_nb <- data.frame(
+  popularity = pop_range_nb,
+  release_year = rep(mean(training_n$release_year, na.rm = TRUE), 100),
+  runtime = rep(mean(training_n$runtime, na.rm = TRUE), 100),
+  budget = rep(mean(training_n$budget, na.rm = TRUE), 100)
+)
+
+pred_probs_nb2 <- predict(nb_model, newdata = pdp_data2_nb, type = "raw")
+
+success_probability2 <- pred_probs_nb[, 2]
+
+pdp_data2_nb$success_probability2 <- success_probability2
+
+ggplot(pdp_data2_nb, aes(x = popularity, y = success_probability2)) +
+  geom_line() +
+  labs(title = "Partial Dependence of Success on popularity (nb)",
+       x = "popularity",
+       y = "Probability of Success") +
+  theme_minimal()
+
+
+rt_range_nb <- seq(from = min(training_n$runtime, na.rm = TRUE), 
+                    to = max(training_n$runtime, na.rm = TRUE), 
+                    length.out = 100)
+
+pdp_data3_nb <- data.frame(
+  runtime = rt_range_nb,
+  release_year = rep(mean(training_n$release_year, na.rm = TRUE), 100),
+  popularity = rep(mean(training_n$popularity, na.rm = TRUE), 100),
+  budget = rep(mean(training_n$budget, na.rm = TRUE), 100)
+)
+
+pred_probs3_nb <- predict(nb_model, newdata = pdp_data3_nb, type = "raw")
+
+success_probability3 <- pred_probs3_nb[, 2]
+
+pdp_data3_nb$success_probability3 <- success_probability3
+
+ggplot(pdp_data3_nb, aes(x = runtime, y = success_probability3)) +
+  geom_line() +
+  labs(title = "Partial Dependence of Success on runtime (nb)",
+       x = "runtime",
+       y = "Probability of Success") +
+  theme_minimal()
+
+
+ry_range_nb <- seq(from = min(training_n$release_year, na.rm = TRUE), 
+                    to = max(training_n$release_year, na.rm = TRUE), 
+                    length.out = 100)
+
+pdp_data4_nb <- data.frame(
+  release_year = ry_range_nb,
+  runtime = rep(mean(training_n$runtime, na.rm = TRUE), 100),
+  popularity = rep(mean(training_n$popularity, na.rm = TRUE), 100),
+  budget = rep(mean(training_n$budget, na.rm = TRUE), 100)
+)
+
+pred_probs4_nb <- predict(nb_model, newdata = pdp_data4_nb, type = "raw")
+
+success_probability4 <- pred_probs_nb[, 2]
+
+pdp_data4_nb$success_probability4 <- success_probability4
+
+ggplot(pdp_data4_nb, aes(x = release_year, y = success_probability4)) +
+  geom_line() +
+  labs(title = "Partial Dependence of Success on release year (LDA)",
+       x = "release year",
+       y = "Probability of Success") +
+  theme_minimal()
+```
+
+
 
 ## Classifying Success with Shrinkage:
 
@@ -756,6 +1047,9 @@ print(lasso_coefficients)
 
 Lasso regression automatically sets some coefficients to zero, removing less important predictors like budget if they do not significantly contribute to the model. By focusing on a smaller set of predictors, Lasso provides a more interpretable model. For example, it reveals that release_year, runtime, and popularity alone are sufficient to predict success. This helps filmmakers focus on the most influential factors, reducing unnecessary expenditures on less critical aspects to make a movie successful.
 
+
+
+
 ## Classifying Success with Logistic Regression:
 
 Objective is to predict whether a movie is successful using logistic regression based on budget, release year, runtime, and popularity.
@@ -801,7 +1095,7 @@ print(paste("Accuracy: ", round(accuracy_lg * 100, 4), "%"))
 The confusion matrix shows the distribution of correct and incorrect predictions. The accuracy percentage provides a measure of how well the model predicts movie success.
 
 
-# PDP for Popularity
+# PDP 
 
 ```{r}
 pdp_budget_lg <- pdp::partial(lg_model, pred.var = "popularity")
@@ -811,6 +1105,30 @@ ggplot(pdp_budget_lg, aes(x = popularity, y = yhat)) +
   ggtitle("Partial Dependence of Success on popularity (Logistic Regression)") +
   xlab("popularity") +
   ylab("Predicted Probability of Success")
+
+pdp_budget_lg2 <- pdp::partial(lg_model, pred.var = "budget")
+
+ggplot(pdp_budget_lg2, aes(x = budget, y = yhat)) + 
+  geom_line() +
+  ggtitle("Partial Dependence of Success on budget") +
+  xlab("budget") +
+  ylab("Predicted Probability of Success") 
+
+pdp_budget_lg3 <- pdp::partial(lg_model, pred.var = "runtime")
+
+ggplot(pdp_budget_lg3, aes(x = runtime, y = yhat)) + 
+  geom_line() +
+  ggtitle("Partial Dependence of Success on runtime") +
+  xlab("runtime") +
+  ylab("Predicted Probability of Success") 
+
+pdp_budget_lg4 <- pdp::partial(lg_model, pred.var = "release_year")
+
+ggplot(pdp_budget_lg4, aes(x = release_year, y = yhat)) + 
+  geom_line() +
+  ggtitle("Partial Dependence of Success on release_year") +
+  xlab("release_year") +
+  ylab("Predicted Probability of Success") 
 ```
 
 
@@ -916,6 +1234,46 @@ cat("Decision Tree Confusion Matrix:\n")
 print(tree_confusion)
 cat("Decision Tree Accuracy: ", round(accuracy_tree * 100, 4), "%\n") 
 ```
+# PDP
+
+```{r}
+pdp_budget_tree <- pdp::partial(tree_model, pred.var = "release_year")
+
+ggplot(pdp_budget_tree, aes(x = release_year, y = yhat)) + 
+  geom_line() +
+  ggtitle("Partial Dependence of Success on release_year") +
+  xlab("release_year") +
+  ylab("Predicted Probability of Success") 
+
+pdp_budget_tree2 <- pdp::partial(tree_model, pred.var = "budget")
+
+ggplot(pdp_budget_tree2, aes(x = budget, y = yhat)) + 
+  geom_line() +
+  ggtitle("Partial Dependence of Success on budget") +
+  xlab("budget") +
+  ylab("Predicted Probability of Success") 
+
+pdp_budget_tree3 <- pdp::partial(tree_model, pred.var = "popularity")
+
+ggplot(pdp_budget_tree3, aes(x = popularity, y = yhat)) + 
+  geom_line() +
+  ggtitle("Partial Dependence of Success on popularity") +
+  xlab("popularity") +
+  ylab("Predicted Probability of Success") 
+
+pdp_budget_tree4 <- pdp::partial(tree_model, pred.var = "runtime")
+
+ggplot(pdp_budget_tree4, aes(x = runtime, y = yhat)) + 
+  geom_line() +
+  ggtitle("Partial Dependence of Success on runtime") +
+  xlab("runtime") +
+  ylab("Predicted Probability of Success") 
+
+
+```
+
+
+
 
 ## Classifying Success with Random Forest (with Feature Importance)
 
@@ -956,6 +1314,45 @@ print(rf_confusion)
 cat("Random Forest Accuracy: ", round(accuracy_rf * 100, 4), "%\n")
 
 ```
+# PDP
+
+```{r}
+pdp_budget_rf <- pdp::partial(rf_model, pred.var = "release_year")
+
+ggplot(pdp_budget_rf, aes(x = release_year, y = yhat)) + 
+  geom_line() +
+  ggtitle("Partial Dependence of Success on release_year") +
+  xlab("release_year") +
+  ylab("Predicted Probability of Success") 
+
+pdp_budget_rf2 <- pdp::partial(rf_model, pred.var = "runtime")
+
+ggplot(pdp_budget_rf2, aes(x = runtime, y = yhat)) + 
+  geom_line() +
+  ggtitle("Partial Dependence of Success on runtime") +
+  xlab("runtime") +
+  ylab("Predicted Probability of Success") 
+
+pdp_budget_rf3 <- pdp::partial(rf_model, pred.var = "popularity")
+
+ggplot(pdp_budget_rf3, aes(x = popularity, y = yhat)) + 
+  geom_line() +
+  ggtitle("Partial Dependence of Success on popularity") +
+  xlab("popularity") +
+  ylab("Predicted Probability of Success") 
+
+pdp_budget_rf4 <- pdp::partial(rf_model, pred.var = "budget")
+
+ggplot(pdp_budget_rf4, aes(x = budget, y = yhat)) + 
+  geom_line() +
+  ggtitle("Partial Dependence of Success on budget") +
+  xlab("budget") +
+  ylab("Predicted Probability of Success") 
+
+
+```
+
+
 
 ## Classifying Success with Neural Networks
 
@@ -1208,9 +1605,11 @@ ggplot(shap_importance, aes(x = reorder(Feature, MeanAbsShap), y = MeanAbsShap))
 #### SHAP Dependence Plot
 
 ```{r, eval=FALSE}
+shap_values_budget <- shap_values[, "budget"]
+
 ggplot(data = data.frame(
-  SHAP_value = shap_values$budget,
-  Feature_value = X$budget
+  SHAP_value = shap_values_budget,
+  Feature_value = df_for_class$budget  # Original feature values for 'budget'
 ), aes(x = Feature_value, y = SHAP_value)) +
   geom_point(alpha = 0.6) +
   geom_smooth(method = "loess", se = FALSE, color = "blue") +
@@ -1218,6 +1617,8 @@ ggplot(data = data.frame(
   xlab("Budget") +
   ylab("SHAP Value") +
   theme_minimal()
+
+
 ```
 
 ### Multiple Regression with t-values for Variable Importance
