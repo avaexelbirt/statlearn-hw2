@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 # Install necessary libraries if not installed
-# install.packages(c("ggplot2", "dplyr", "scales", "lubridate"))
+#install.packages(c("ggplot2", "dplyr", "scales", "lubridate"))
 # install.packages("caret")
 # install.packages("GGally")
 # install.packages("tidyverse")
@@ -41,6 +41,7 @@ library(randomForest)
 library(pdp)
 library(fastshap)
 library(effects)
+library(e1071)
 ```
 
 # About the Data
@@ -110,10 +111,6 @@ We will look at how many NA values are in each column to better understand our d
 na_counts <- colSums(is.na(horror))
 
 print(na_counts)
-
-na_counts_df <- data.frame(Column = names(na_counts), NA_Count = na_counts)
-print(na_counts_df)
-
 ```
 
 ```{r}
@@ -132,7 +129,6 @@ horror[numeric_cols] <- lapply(horror[numeric_cols], function(x) {
   ifelse(is.na(x), median(x, na.rm = TRUE), x)
 })
 
-## Fill missing character columns with "Unknown"
 char_cols <- sapply(horror, is.character)
 horror[char_cols] <- lapply(horror[char_cols], function(x) {
   ifelse(is.na(x), "Unknown", x)
@@ -145,9 +141,6 @@ horror[char_cols] <- lapply(horror[char_cols], function(x) {
 We will remove the columns ids and paths as these are not needed for our overall analysis.
 
 ```{r}
-library(dplyr)
-
-# Drop the specified columns
 #horror <- horror |> select(-id, -poster_path, -backdrop_path, -collection, -collection_name)
 
 horror <- dplyr::select(horror, -id, -poster_path, -backdrop_path, -collection, -collection_name)
@@ -196,13 +189,11 @@ We first create a profit variable that is the revenue minus budget of a movie. W
 ```{r make-targ}
 horror$profit <- horror$revenue - horror$budget
 horror$success <- ifelse(horror$profit > 0, "Success", "No Success")
-
 ```
 
 ### Making data frame with no 0s
-
+Create a new data frame without rows where revenue and budget is 0
 ```{r}
-# Create a new data frame without rows where revenue and budget is 0
 df_for_class = subset(horror, revenue != 0 & budget != 0)
 df_for_class$success = as.factor(df_for_class$success)
 
@@ -246,46 +237,24 @@ ggcorr(df_for_class[ , sapply(df_for_class, is.numeric)], label = TRUE)
 ### Distribution of Numeric Features
 
 We will plot the distributions of numeric features, specifically budget, revenue, and runtime.
-
-```{r num-dist}
-ggplot(df_for_class, aes(x = budget)) +
-  geom_histogram(binwidth = 1e7, fill = "blue", color = "black", alpha = 0.7) +
-  labs(title = "Distribution of Budget", x = "Budget", y = "Count") +
-  theme_minimal()
-
-ggplot(df_for_class, aes(x = revenue)) +
-  geom_histogram(binwidth = 1e7, fill = "green", color = "black", alpha = 0.7) +
-  labs(title = "Distribution of Revenue", x = "Revenue", y = "Count") +
-  theme_minimal()
-
-ggplot(df_for_class, aes(x = runtime)) +
-  geom_histogram(binwidth = 10, fill = "red", color = "black", alpha = 0.7) +
-  labs(title = "Distribution of Runtime", x = "Runtime (Minutes)", y = "Count") +
-  theme_minimal()
-```
-
 ```{r}
-# For Budget (which has large values)
 ggplot(df_for_class, aes(x = budget)) +
-  geom_histogram(binwidth = 1e7, fill = "blue", color = "black", alpha = 0.7) +  # Increase binwidth
+  geom_histogram(binwidth = 1e7, fill = "blue", color = "black", alpha = 0.7) + 
   labs(title = "Distribution of Budget", x = "Budget", y = "Count") +
   theme_minimal()
 
-# For Revenue (which also has large values)
 ggplot(df_for_class, aes(x = revenue)) +
-  geom_histogram(binwidth = 1e8, fill = "green", color = "black", alpha = 0.7) +  # Increase binwidth
+  geom_histogram(binwidth = 1e8, fill = "green", color = "black", alpha = 0.7) +  
   labs(title = "Distribution of Revenue", x = "Revenue", y = "Count") +
   theme_minimal()
 
-# For Runtime (which typically has smaller values)
 ggplot(df_for_class, aes(x = runtime)) +
-  geom_histogram(binwidth = 5, fill = "red", color = "black", alpha = 0.7) +  # Adjust binwidth for runtime
+  geom_histogram(binwidth = 5, fill = "red", color = "black", alpha = 0.7) +  
   labs(title = "Distribution of Runtime", x = "Runtime (Minutes)", y = "Count") +
   theme_minimal()
 
 ```
-
-Budget and revenue are both right skewed and unimodal. Runtime is also right skewed, but bimodal.
+Budget and revenue are both right skewed and unimodal. Runtime is also right skewed, but could be considered to be bimodal.
 
 ### Distribution of Some Categorical Features
 
@@ -306,7 +275,7 @@ ggplot(df_for_class, aes(x = budget_category, fill = budget_category)) +
 
 ```
 
-Release year is left skewed and unimodal.
+Release year is left skewed and unimodal. Most movies were made with a low budget and only very few movies were made with a high budget.
 
 ### Distribution of Target Variable
 
@@ -344,7 +313,7 @@ ggplot(df_for_class, aes(x = release_year, y = budget)) +
   geom_point(aes(color = budget_category), alpha = 0.7) +
   scale_x_continuous(labels = scales::comma) +
   scale_y_continuous(labels = scales::comma) +
-  labs(title = "Release Year vs")
+  labs(title = "Release Year vs Budget")
 
 ggplot(df_for_class, aes(x = popularity, y = vote_average)) +
   geom_point(aes(color = genre_names), alpha = 0.7) +
@@ -371,56 +340,44 @@ ggplot(df_for_class, aes(x = success, y = profit, fill = success)) +
 ```
 
 ### Training Visuals
+We will now do EDA but for data in the training data set instead of the original data set to see how the ditrubutions change or not for each variable. 
 
 ```{r}
-# Visualizing the distribution of 'budget' in training data
 ggplot(training, aes(x = budget)) + 
   geom_density(fill = "lightblue") + 
   labs(title = "Density of Budget", x = "Budget", y = "Density")
 
-# Visualizing the distribution of 'revenue' in training data
 ggplot(training, aes(x = revenue)) + 
   geom_density(fill = "lightgreen") + 
   labs(title = "Density of Revenue", x = "Revenue", y = "Density")
 
-# Visualizing 'budget' against 'revenue'
-ggplot(training, aes(x = budget, y = revenue)) + 
-  geom_point(aes(color = budget_category), alpha = 0.7) + 
-  scale_x_continuous(labels = scales::comma) + 
-  scale_y_continuous(labels = scales::comma) + 
-  labs(title = "Budget vs Revenue", x = "Budget", y = "Revenue") + 
-  theme_minimal() + 
-  theme(legend.title = element_blank())
+ggplot(training, aes(fill = budget_category, x = revenue)) + 
+  geom_density() + 
+  labs(title = "Density of Revenue and Budget", x = "Revenue", y = "Density")
 
-# Exploring 'runtime' distribution
 ggplot(training, aes(x = runtime)) + 
   geom_density(fill = "lightcoral") + 
   labs(title = "Density of Runtime", x = "Runtime", y = "Density")
 
-# Exploring 'popularity' distribution
 ggplot(training, aes(x = popularity)) + 
   geom_density(fill = "lightyellow") + 
   labs(title = "Density of Popularity", x = "Popularity", y = "Density")
 
-# Decomposing runtime by 'budget_category'
 ggplot(training, aes(x = runtime, fill = budget_category)) + 
   geom_density(alpha = 0.5) + 
   labs(title = "Runtime by Budget Category", x = "Runtime", y = "Density")
 
-# Visualizing 'vote_average' distribution
 ggplot(training, aes(x = vote_average)) + 
   geom_density(fill = "lightblue") + 
   labs(title = "Density of Vote Average", x = "Vote Average", y = "Density")
 
-# Visualizing 'release_year' distribution
 ggplot(training, aes(x = release_year)) + 
   geom_bar(fill = "lightgreen") + 
   labs(title = "Release Year Distribution", x = "Release Year", y = "Count")
 
-# Visualizing the distribution of 'success' in training data
 ggplot(training, aes(x = success)) + 
   geom_bar(fill = "lightblue", color = "black") + 
-  labs(title = "Distribution of Success", x = "Success", y = "Count") + 
+  labs(title = "Distribution of Success in Training Set", x = "Success", y = "Count") + 
   theme_minimal()
 
 ```
@@ -437,23 +394,18 @@ ggplot(training, aes(x = success)) +
 6.  Predicting whether a movie was a success or not is our main objective.
 
 # Normalizing the data
-
+We will normalize the data with the min-max normalization function which will later be split into training and testing and used for models that need normalized data.
 ```{r}
-# Columns to normalize
 columns_to_normalize <- c("budget", "release_year", "runtime", "popularity")
 
-# Min-max normalization function
 min_max_normalize <- function(x) {
   (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
 }
 
-# Create a copy of the original data frame
 df_normal <- df_for_class
 
-# Normalize only the specified columns
 df_normal[columns_to_normalize] <- lapply(df_for_class[columns_to_normalize], min_max_normalize)
 
-# Check the structure to confirm normalization
 str(df_normal)
 
 ```
@@ -472,29 +424,28 @@ summary(training_n)
 ```
 
 ## Visualizing the Relationships
-
+We will visualize the relationships between the variables we chose to use to revenue, colored by success.
 ```{r}
 library(ggplot2)
 
-# Scatter plots to see the relationships
-ggplot(df_for_class, aes(x = budget, y = success)) +
+ggplot(df_for_class, aes(x = budget, y = revenue, color = success)) +
   geom_point() + 
-  labs(title = "Budget vs Success", x = "Budget", y = "Success") +
+  labs(title = "Budget vs Revenue and Success", x = "Budget", y = "Revenue") +
   theme_minimal()
 
-ggplot(df_for_class, aes(x = release_year, y = success)) +
+ggplot(df_for_class, aes(x = release_year, y = revenue, color = success)) +
   geom_point() + 
-  labs(title = "Release Year vs Success", x = "Release Year", y = "Success") +
+  labs(title = "Release Year vs Revenue and Success", x = "Release Year", y = "Revenue") +
   theme_minimal()
 
-ggplot(df_for_class, aes(x = popularity, y = success)) +
+ggplot(df_for_class, aes(x = popularity, y = revenue, color = success)) +
   geom_point() + 
-  labs(title = "Popularity vs Success", x = "Popularity", y = "Success") +
+  labs(title = "Popularity vs Revenue and Success", x = "Popularity", y = "Revenue") +
   theme_minimal()
 
-ggplot(df_for_class, aes(x = run_time, y = success)) +
+ggplot(df_for_class, aes(x = runtime, y = revenue, color = success)) +
   geom_point() + 
-  labs(title = "Runtime vs Success", x = "Runtime", y = "Success") +
+  labs(title = "Runtime vs Revenue and Success", x = "Runtime", y = "Revenue") +
   theme_minimal()
 
 ```
@@ -505,13 +456,10 @@ ggplot(df_for_class, aes(x = run_time, y = success)) +
 
 ```{r}
 lda_model <- lda(success ~ budget + release_year + runtime + popularity, data = training_n)
-
 lda_model
-
 ```
 
 ### Predicting
-
 We will first predict success categories and then add the predictions to the LDA dataset for visualizing the predictions.
 
 ```{r}
@@ -784,8 +732,6 @@ Naive Bayes is a probabilistic model based on Bayes' Theorem. The model assumes 
 ### Training the Model
 
 ```{r}
-library(e1071)
-
 nb_model <- naiveBayes(success ~ budget + release_year + runtime + popularity, data = training)
 
 print(nb_model)
@@ -927,7 +873,7 @@ Shrinkage methods we will use are Lasso and Ridge Regression. Lasso helps with f
 
 ### Ridge Regression
 
-Ridge regression reduces variance in the presence of highly correlated predictors like budget and popularity, ensuring effective predictions. Although all predictors are kept, their coefficients are shrunk, reflecting their relative importance. For instance, popularity might have a higher coefficient than runtime, indicating its stronger influence on predicting success. This is useful because some filmmakers may want a holistic view of all contributing factors, even those with smaller effects.
+Ridge regression reduces variance in the presence of highly correlated predictors like budget and popularity, ensuring effective predictions. Although all predictors are kept, their coefficients are shrunk, reflecting their relative importance. For instance, popularity has a higher coefficient than the, indicating its stronger influence on predicting success. This is useful because some filmmakers may want a holistic view of all contributing factors, even those with smaller effects.
 
 #### Training the Model
 
@@ -980,6 +926,7 @@ print(ridge_coefficients)
 
 ```
 
+We can see that popularity has a coefficient of about 53.72, while the other variables have coefficients closer to 0. This shows that popularity has the biggest (positive) influence on predicting success.
 ### Lasso Regression
 
 #### Training the Model
@@ -1029,8 +976,7 @@ lasso_coefficients <- as.matrix(coef(lasso_model))
 print(lasso_coefficients)
 
 ```
-
-Lasso regression automatically sets some coefficients to zero, removing less important predictors like budget if they do not significantly contribute to the model. By focusing on a smaller set of predictors, Lasso provides a more interpretable model. For example, it reveals that release_year, runtime, and popularity alone are sufficient to predict success. This helps filmmakers focus on the most influential factors, reducing unnecessary expenditures on less critical aspects to make a movie successful.
+Lasso regression automatically sets some coefficients to zero, removing less important predictors like budget if they do not significantly contribute to the model. By focusing on a smaller set of predictors, Lasso provides a more interpretable model. Lasso confirms Ridge's output by also revealing that the coefficient for popularity is the largest, at about 87.51. This means that popularity has a strong positive relationship on predicting success. This helps filmmakers focus on the most influential factors, reducing unnecessary expenditures on less critical aspects to make a movie successful.
 
 ## Classifying Success with Logistic Regression:
 
@@ -1123,7 +1069,7 @@ library(nnet)
 
 ```{r}
 budget_quartiles <- quantile(training_n$budget, probs = c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE)
-budget_quartiles <- unique(budget_quartiles)  # Remove duplicate values
+budget_quartiles <- unique(budget_quartiles)  
 
 if (length(budget_quartiles) - 1 != 4) {
   stop("Unable to create exactly 4 quartile groups due to duplicate breaks. Please inspect the data.")
@@ -1272,7 +1218,7 @@ This shows which features contribute most to the model.
 importance <- importance(rf_model)
 varImpPlot(rf_model)
 ```
-
+We can see popularity contributes the most to the model with budget next, then release year, and runtime being the least contributable predictor. 
 ### Prediction
 
 ```{r}
@@ -1424,10 +1370,10 @@ print(paste("Accuracy: ", round(accuracy_gbm * 100, 4), "%"))
 importance <- summary(gbm_model)
 print(importance)
 ```
-
+We can see that this model predicts popularity to have the most relative influence, followed by release year, then budget, than runtime. This is different from the other models as the others predict budget as the second most influential variable. 
 **Prediction** using Logistic regression answers the question, "Can we predict success?"
 
-**Interpretation** using LDA highlights "Why are some movies predicted as successful or unsuccessful?" by examining variable relationships and decision boCundaries.
+**Interpretation** using LDA highlights "Why are some movies predicted as successful or unsuccessful?" by examining variable relationships and decision boundaries.
 
 # Feature Selection and Comparison of Predictor Sets
 
