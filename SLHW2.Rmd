@@ -20,6 +20,7 @@ knitr::opts_chunk$set(echo = TRUE)
 #install.packages("randomForest")
 # install.packages("gbm")
 # install.packages("fastshap")
+#install.packages("effects")
 ```
 
 ```{r libraries}
@@ -39,6 +40,7 @@ library(MASS)
 library(randomForest)
 library(pdp)
 library(fastshap)
+library(effects)
 ```
 
 # About the Data
@@ -197,7 +199,7 @@ horror$success <- ifelse(horror$profit > 0, "Success", "No Success")
 
 ```
 
-# Making data frame with no 0s
+### Making data frame with no 0s
 
 ```{r}
 # Create a new data frame without rows where revenue and budget is 0
@@ -232,7 +234,6 @@ summary(training)
 ```{r show-dist}
 table(training$success) / length(training$success)
 ```
-
 
 ### Correlation Analysis
 
@@ -311,7 +312,6 @@ Release year is left skewed and unimodal.
 
 We will now look at the distribution of our target variable, show_or_movie.
 
-###CHANGE WITH NEW PREDICTOR
 
 ```{r}
 sum(df_for_class$success == "Success")
@@ -369,9 +369,6 @@ ggplot(df_for_class, aes(x = success, y = profit, fill = success)) +
   theme(legend.title = element_blank())
 
 ```
-
-
-
 
 ### Training Visuals
 
@@ -435,10 +432,11 @@ ggplot(training, aes(x = success)) +
 1.  "How well can we predict a movie's revenue based on its budget, popularity, and release year?" (Regression)
 2.  Predicting popularity (Regression)
 3.  "Can we predict whether a movie will be profitable?" (QDA and LDA)
-4.  "predicting success categories (hit, average, flop) (QDA and LDA)
+4.  "Predicting success categories (hit, average, flop) (QDA and LDA)
 5.  Predicting Budget using logistic regression
+6.  Predicting whether a movie was a success or not is our main objective.
 
-# normalizing the data
+# Normalizing the data
 
 ```{r}
 # Columns to normalize
@@ -460,7 +458,7 @@ str(df_normal)
 
 ```
 
-# Splitting training and testing for normalized data
+## Splitting training and testing for normalized data
 
 ```{r}
 in_train_n <- createDataPartition(df_normal$budget_category, p = 0.6, list = FALSE)
@@ -479,34 +477,24 @@ summary(training_n)
 library(ggplot2)
 
 # Scatter plots to see the relationships
-ggplot(df_for_class, aes(x = revenue, y = budget)) +
+ggplot(df_for_class, aes(x = budget, y = success)) +
   geom_point() + 
-  labs(title = "Budget vs Revenue", x = "Revenue", y = "Budget") +
+  labs(title = "Budget vs Success", x = "Budget", y = "Success") +
   theme_minimal()
 
-ggplot(df_for_class, aes(x = release_year, y = budget)) +
+ggplot(df_for_class, aes(x = release_year, y = success)) +
   geom_point() + 
-  labs(title = "Budget vs Release Year", x = "Release Year", y = "Budget") +
+  labs(title = "Release Year vs Success", x = "Release Year", y = "Success") +
   theme_minimal()
 
-ggplot(df_for_class, aes(x = popularity, y = budget)) +
+ggplot(df_for_class, aes(x = popularity, y = success)) +
   geom_point() + 
-  labs(title = "Budget vs Popularity", x = "Popularity", y = "Budget") +
+  labs(title = "Popularity vs Success", x = "Popularity", y = "Success") +
   theme_minimal()
 
-ggplot(df_for_class, aes(x = popularity, y = revenue)) +
+ggplot(df_for_class, aes(x = run_time, y = success)) +
   geom_point() + 
-  labs(title = "Revenue vs Popularity", x = "Popularity", y = "Revenue") +
-  theme_minimal()
-
-ggplot(df_for_class, aes(x = release_year, y = revenue)) +
-  geom_point() + 
-  labs(title = "Revenue vs Release Year", x = "Release Year", y = "Revenue") +
-  theme_minimal()
-
-ggplot(df_for_class, aes(x = release_year, y = popularity)) +
-  geom_point() + 
-  labs(title = "Popularity vs Release Year", x = "Popularity", y = "Budget") +
+  labs(title = "Runtime vs Success", x = "Runtime", y = "Success") +
   theme_minimal()
 
 ```
@@ -559,7 +547,9 @@ ggplot(testing_n, aes(x = budget, y = popularity, color = lda_predicted_success)
   theme_minimal()
 
 ```
-# PDP 
+
+### PDP
+
 ```{r}
 
 budget_range <- seq(from = min(training_n$budget, na.rm = TRUE), 
@@ -662,7 +652,7 @@ ggplot(pdp_data4, aes(x = release_year, y = success_probability)) +
 
 ## Classifying Success with QDA
 
-### Training the model 
+### Training the model
 
 ```{r}
 qda_model = qda(success ~ budget + release_year + runtime + popularity, data = training_n)
@@ -691,7 +681,8 @@ print(confusion_matrix_qda)
 accuracy_qda <- sum(qda_predictions == testing_n$success) / length(qda_predictions)
 print(paste("Accuracy: ", round(accuracy_qda * 100, 4), "%"))
 ```
-# PDP 
+
+### PDP
 
 ```{r}
 budget_range_qda <- seq(from = min(training_n$budget, na.rm = TRUE), 
@@ -786,9 +777,6 @@ ggplot(pdp_data4_qda, aes(x = release_year, y = success_probability)) +
   theme_minimal()
 ```
 
-
-
-
 ## Classifying Success with Naive Bayes:
 
 Naive Bayes is a probabilistic model based on Bayes' Theorem. The model assumes that the features are conditionally independent given the target variable, success.
@@ -828,7 +816,8 @@ print(paste("Accuracy: ", round(accuracy_nb *100, 4), "%"))
 
 
 ```
-# PDP 
+
+### PDP
 
 ```{r}
 budget_range_nb <- seq(from = min(training_n$budget, na.rm = TRUE), 
@@ -932,8 +921,6 @@ ggplot(pdp_data4_nb, aes(x = release_year, y = success_probability4)) +
   theme_minimal()
 ```
 
-
-
 ## Classifying Success with Shrinkage:
 
 Shrinkage methods we will use are Lasso and Ridge Regression. Lasso helps with feature selection and Ridge Regression helps with handling multicollinearity.
@@ -945,8 +932,6 @@ Ridge regression reduces variance in the presence of highly correlated predictor
 #### Training the Model
 
 We will fit the Ridge model with cross-validation to find the optimal lambda. Then, we will use that best lambda to train the model.
-
-# Ridge Regression
 
 ```{r}
 library(glmnet)
@@ -1047,9 +1032,6 @@ print(lasso_coefficients)
 
 Lasso regression automatically sets some coefficients to zero, removing less important predictors like budget if they do not significantly contribute to the model. By focusing on a smaller set of predictors, Lasso provides a more interpretable model. For example, it reveals that release_year, runtime, and popularity alone are sufficient to predict success. This helps filmmakers focus on the most influential factors, reducing unnecessary expenditures on less critical aspects to make a movie successful.
 
-
-
-
 ## Classifying Success with Logistic Regression:
 
 Objective is to predict whether a movie is successful using logistic regression based on budget, release year, runtime, and popularity.
@@ -1094,8 +1076,7 @@ print(paste("Accuracy: ", round(accuracy_lg * 100, 4), "%"))
 
 The confusion matrix shows the distribution of correct and incorrect predictions. The accuracy percentage provides a measure of how well the model predicts movie success.
 
-
-# PDP 
+### PDP
 
 ```{r}
 pdp_budget_lg <- pdp::partial(lg_model, pred.var = "popularity")
@@ -1130,7 +1111,6 @@ ggplot(pdp_budget_lg4, aes(x = release_year, y = yhat)) +
   xlab("release_year") +
   ylab("Predicted Probability of Success") 
 ```
-
 
 ## Classifying Budget into four predicted groups with multinomial logistic regression:
 
@@ -1234,7 +1214,8 @@ cat("Decision Tree Confusion Matrix:\n")
 print(tree_confusion)
 cat("Decision Tree Accuracy: ", round(accuracy_tree * 100, 4), "%\n") 
 ```
-# PDP
+
+### PDP
 
 ```{r}
 pdp_budget_tree <- pdp::partial(tree_model, pred.var = "release_year")
@@ -1271,9 +1252,6 @@ ggplot(pdp_budget_tree4, aes(x = runtime, y = yhat)) +
 
 
 ```
-
-
-
 
 ## Classifying Success with Random Forest (with Feature Importance)
 
@@ -1314,7 +1292,8 @@ print(rf_confusion)
 cat("Random Forest Accuracy: ", round(accuracy_rf * 100, 4), "%\n")
 
 ```
-# PDP
+
+### PDP
 
 ```{r}
 pdp_budget_rf <- pdp::partial(rf_model, pred.var = "release_year")
@@ -1351,8 +1330,6 @@ ggplot(pdp_budget_rf4, aes(x = budget, y = yhat)) +
 
 
 ```
-
-
 
 ## Classifying Success with Neural Networks
 
@@ -1513,17 +1490,14 @@ ADD Interpretations
 
 #### Partial Dependence Plot
 
-```{r, eval=FALSE}
-# Assuming 'trainData' is your dataset used to train the 'gbm_model'
-
-# Generate the partial dependence plot for 'runtime'
-pdp_runtime <- partial(gbm_model, 
-                       pred.var = "runtime", 
+```{r}
+pdp_success <- partial(gbm_model, 
+                       pred.var = "success", 
                        n.trees = gbm.perf(gbm_model, method = "cv"),
                        train = trainData)  # Ensure the training data is passed
 
 # Plot Partial Dependence Plot with rug
-autoplot(pdp_runtime, rug = TRUE) + 
+autoplot(pdp_success, rug = TRUE) + 
   ggtitle("Partial Dependence Plot for Runtime") +
   xlab("Runtime") +
   ylab("Predicted Probability of Success") +
@@ -1536,7 +1510,7 @@ autoplot(pdp_runtime, rug = TRUE) +
 
 We can use stepwise regression to identify the most relevant features for logistic regression.
 
-```{r, eval=FALSE}
+```{r}
 full_model <- glm(success ~ budget + release_year + runtime + popularity, data = df_for_class, family = binomial)
 step_model <- stepAIC(full_model, direction = "both")
 summary(step_model)
@@ -1550,7 +1524,7 @@ Interpretation: (ADD with context)
 
 #### SHAP Analysis with Random Forest
 
-```{r, eval=FALSE}
+```{r}
 predict_function <- function(object, newdata) {
   predict(object, newdata = newdata, type = "prob")[, "Success"]
 }
@@ -1563,9 +1537,8 @@ y <- horror$success
 
 #### Compute SHAP Values + Mean Absolute SHAP Values
 
-```{r, eval=FALSE}
-# Convert 'success' to a factor if it's not already
-df_for_class$success <- factor(df_for_class$success, levels = c(0, 1), labels = c("No Success", "Success"))
+```{r}
+
 # Define the prediction function for SHAP
 predict_function <- function(object, newdata) {
   predict(object, newdata = newdata, type = "prob")[, "Success"]  # Get probabilities for 'Success' class
@@ -1591,7 +1564,7 @@ shap_importance <- data.frame(
 
 #### SHAP Feature Importance Plot
 
-```{r, eval=FALSE}
+```{r}
 ggplot(shap_importance, aes(x = reorder(Feature, MeanAbsShap), y = MeanAbsShap)) +
   geom_bar(stat = "identity", fill = "purple") +
   coord_flip() +
@@ -1604,7 +1577,7 @@ ggplot(shap_importance, aes(x = reorder(Feature, MeanAbsShap), y = MeanAbsShap))
 
 #### SHAP Dependence Plot
 
-```{r, eval=FALSE}
+```{r}
 shap_values_budget <- shap_values[, "budget"]
 
 ggplot(data = data.frame(
@@ -1623,9 +1596,9 @@ ggplot(data = data.frame(
 
 ### Multiple Regression with t-values for Variable Importance
 
-```{r, eval=FALSE}
+```{r}
 # View the summary of the model to check t-values and p-values
-summary(lm_model)
+summary(lg_model)
 
 # The t-values are listed in the "t value" column of the summary.
 # High t-values indicate important features, low t-values indicate less important features.
@@ -1635,25 +1608,6 @@ summary(lm_model)
 
 -   A **low t-value** (near 0) suggests that the predictor doesn't contribute much to the model and may be removed.
 
-### Recursive Feature Elimination (RFE)
-
-```{r, eval=FALSE}
-# Define the control parameters for RFE
-ctrl <- rfeControl(functions = rfFuncs, method = "cv", number = 10)
-
-# Perform Recursive Feature Elimination using Random Forest as the model
-rfe_result <- rfe(df_for_class[, c("budget", "release_year", "runtime", "popularity")], 
-                  df_for_class$success, 
-                  sizes = c(1:4),  # Try selecting from 1 to 4 features
-                  rfeControl = ctrl)
-
-# View the results
-print(rfe_result)
-
-# Plot the results
-plot(rfe_result, type = c("g", "o"))
-
-```
 
 ## Comparing Predictor Sets
 
@@ -1661,12 +1615,21 @@ plot(rfe_result, type = c("g", "o"))
 
 We will use all available predictors: budget, release_year, runtime, and popularity.
 
-```{r, eval=FALSE}
-base_model <- glm(success ~ budget + release_year + runtime + popularity, data = df_for_class, family = binomial)
+```{r}
+
+# Fit logistic regression model
+base_model <- glm(success ~ budget + release_year + runtime + popularity, 
+                  data = df_normal, 
+                  family = binomial)
+
+# Predict probabilities and classify
 base_probs <- predict(base_model, type = "response")
 base_preds <- ifelse(base_probs > 0.5, 1, 0)
-base_accuracy <- mean(base_preds == df_for_class$success)
+
+# Calculate accuracy
+base_accuracy <- mean(base_preds == df_normal$success)
 cat("Base Model Accuracy: ", base_accuracy, "\n")
+
 
 ```
 
@@ -1674,19 +1637,27 @@ cat("Base Model Accuracy: ", base_accuracy, "\n")
 
 We will now use only the most important predictors identifies through feature selection **(ADD WHEN FOUND ABOVE).**
 
-```{r, eval=FALSE}
+```{r}
 #EXAMPLE BUT CHANGE WHEN FIND PREDICTORS TO USE
-reduced_model <- glm(success ~ budget + popularity, data = df_for_class, family = binomial)
+reduced_model <- glm(success ~ budget + popularity, data = df_normal, family = binomial)
 reduced_probs <- predict(reduced_model, type = "response")
 reduced_preds <- ifelse(reduced_probs > 0.5, 1, 0)
-reduced_accuracy <- mean(reduced_preds == df_for_class$success)
+reduced_accuracy <- mean(reduced_preds == df_normal$success)
 cat("Reduced Model Accuracy: ", reduced_accuracy, "\n")
 
 ```
 
 ### Comparing Models with Different Predictor Sets
+```{r}
+table(df_for_class$success)
 
-```{r, eval=FALSE}
+```
+
+
+```{r}
+# Remove rows with missing values
+df_for_class <- na.omit(df_for_class)
+
 # Load necessary libraries
 library(randomForest)
 library(caret)
@@ -1749,18 +1720,19 @@ lm_accuracy_4 <- train_lm_model(predictor_set_4, df_for_class)
 performance_comparison <- data.frame(
   Model = c("Random Forest (Set 1)", "Random Forest (Set 2)", "Random Forest (Set 3)", "Random Forest (Set 4)",
             "Linear Regression (Set 1)", "Linear Regression (Set 2)", "Linear Regression (Set 3)", "Linear Regression (Set 4)"),
-  AUC_or_Accuracy = c(rf_auc_1, rf_auc_2, rf_auc_3, rf_auc_4, 
+  AUC_or_Accuracy = c(rf_auc_1, rf_auc_2, rf_auc_3, rf_auc_4,
                       lm_accuracy_1, lm_accuracy_2, lm_accuracy_3, lm_accuracy_4)
 )
 
 # Print performance comparison
 print(performance_comparison)
 
+
 ```
 
 ### Plotting Performance Comparison
 
-```{r, eval=FALSE}
+```{r}
 # Plot the comparison
 library(ggplot2)
 
@@ -1778,11 +1750,11 @@ ggplot(performance_comparison, aes(x = Model, y = AUC_or_Accuracy, fill = Model)
 
 We can test whether interaction terms improve model performance.
 
-```{r, eval=FALSE}
-interaction_model <- glm(success ~ budget * popularity + runtime, data = df_for_class, family = binomial)
+```{r}
+interaction_model <- glm(success ~ budget * popularity + runtime, data = df_normal, family = binomial)
 interaction_probs <- predict(interaction_model, type = "response")
 interaction_preds <- ifelse(interaction_probs > 0.5, 1, 0)
-interaction_accuracy <- mean(interaction_preds == df_for_class$success)
+interaction_accuracy <- mean(interaction_preds == df_normal$success)
 cat("Interaction Model Accuracy: ", interaction_accuracy, "\n")
 
 ```
@@ -1791,7 +1763,7 @@ cat("Interaction Model Accuracy: ", interaction_accuracy, "\n")
 
 Use cross-validation to evaluate the generalizability of each predictor set.
 
-```{r, eval=FALSE}
+```{r}
 # Base Model
 base_cv <- train(success ~ budget + release_year + runtime + popularity, data = df_for_class, method = "glm", family = binomial, trControl = trainControl(method = "cv", number = 5))
 print(base_cv)
@@ -1807,12 +1779,7 @@ print(reduced_cv)
 
 Visualize the effect of individual predictors on the probability of success.
 
-```{r, eval=FALSE}
-install.packages("effects")
-library(effects)
-```
-
-```{r, eval=FALSE}
+```{r}
 
 effect_plot <- allEffects(reduced_model)
 plot(effect_plot)
@@ -1822,19 +1789,15 @@ plot(effect_plot)
 
 Use this for tree based models like Random Forest.
 
-```{r, eval=FALSE}
-install.packages("pdp")
-library(pdp)
-```
 
-```{r, eval=FALSE}
+```{r}
 # Partial dependence for "budget"
 pd_budget <- partial(rf_model, pred.var = "budget")
 plotPartial(pd_budget)
 
 ```
 
-```{r, eval=FALSE}
+```{r}
 pd_popularity <- partial(rf_model, pred.var = "popularity")
 plotPartial(pd_popularity)
 ```
