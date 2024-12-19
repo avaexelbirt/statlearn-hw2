@@ -1390,12 +1390,16 @@ library(corrplot)
 corrplot(correlation_matrix, method = "circle")
 
 ```
+```{r}
+selected_vars <- df_for_class[, c("budget", "release_year", "runtime", "popularity")]
 
-Interpretation: (ADD with context)
+correlation_matrix <- cor(selected_vars)
 
--   Strong correlations (close to ±1) between a predictor and `success` suggest high relevance.
+library(corrplot)
+corrplot(correlation_matrix, method = "circle")
 
--   Avoid using highly correlated predictors simultaneously to prevent redundancy.
+```
+Checking to make sure there is no multicollinearity present for the variables we chose to predict. We can see that there is no multicollinearity present as the correlations between the variables we chose are small. 
 
 ### Variable Importance from Random Forest
 
@@ -1405,13 +1409,7 @@ Random Forest provides a direct measure of feature importance.
 rf_model <- randomForest(success ~ budget + release_year + runtime + popularity, data = df_for_class, importance = TRUE)
 varImpPlot(rf_model)
 ```
-
-Interpretation: (ADD with context)
-
--   The variable importance plot ranks features based on their contribution to classification accuracy.
-
--   Features with higher Mean Decrease Accuracy or Mean Decrease Gini should be prioritized.
-
+We already saw above when we did the random forest model that random forest predicts popularity to be the most influential predictor on success. However when we do random forest on the data set and not the training the second most influential variable changes. For MeanDecreaseAccuracy (which shows how a feature effects the overall prediction accuracy), it shows release_year next, followed by budget then runtime. For MeanDecreaseGini (which shows how a feature influences the splitting criteria) shows budget next, followed by release year and then runtime.
 ### Gradient Boosting Feature Importance and Partial Dependence
 
 #### Feature Importance and Plot
@@ -1422,7 +1420,6 @@ importance_df_gbm <- data.frame(
   Importance = summary(gbm_model)$rel.inf
 )
 
-# Plot Feature Importances
 ggplot(importance_df_gbm, aes(x = reorder(Feature, Importance), y = Importance)) +
   geom_bar(stat = "identity", fill = "darkorange") +
   coord_flip() +
@@ -1431,26 +1428,7 @@ ggplot(importance_df_gbm, aes(x = reorder(Feature, Importance), y = Importance))
   ylab("Relative Influence") +
   theme_minimal()
 ```
-
-ADD Interpretations
-
-#### Partial Dependence Plot
-
-```{r}
-pdp_success <- partial(gbm_model, 
-                       pred.var = "success", 
-                       n.trees = gbm.perf(gbm_model, method = "cv"),
-                       train = trainData)  # Ensure the training data is passed
-
-# Plot Partial Dependence Plot with rug
-autoplot(pdp_success, rug = TRUE) + 
-  ggtitle("Partial Dependence Plot for Runtime") +
-  xlab("Runtime") +
-  ylab("Predicted Probability of Success") +
-  theme_minimal()
-
-
-```
+Shows popularity, then release year, then budget, then runtime is the order of relative influence of predictor variables to the overall success. 
 
 ### Stepwise Selection
 
@@ -1462,9 +1440,7 @@ step_model <- stepAIC(full_model, direction = "both")
 summary(step_model)
 ```
 
-Interpretation: (ADD with context)
-
--   Features retained in the final model are likely to be the most predictive.
+Release_year and popularity have strong effects on predicting the success of a movie. As release_year increases, success decreases, while higher popularity increases success. Runtime is somewhat important, but its effect is weaker compared to the other variables. Initially, the model included budget, release_year, runtime, and popularity. After stepwise selection, the final model excluded budget and only included release_year, runtime, and popularity. You can see this from the change in AIC values during the stepwise process. The AIC value decreased from 1313.79 to 1311.8 after the removal of budget, indicating a slightly better model fit when excluding this variable.
 
 ### SHAP Values for Model Interpretability
 
@@ -1475,7 +1451,6 @@ predict_function <- function(object, newdata) {
   predict(object, newdata = newdata, type = "prob")[, "Success"]
 }
 
-# Explanatory dataset
 X <- horror[, c("budget", "release_year", "runtime", "popularity")]
 y <- horror$success
 
@@ -1485,22 +1460,19 @@ y <- horror$success
 
 ```{r}
 
-# Define the prediction function for SHAP
 predict_function <- function(object, newdata) {
-  predict(object, newdata = newdata, type = "prob")[, "Success"]  # Get probabilities for 'Success' class
+  predict(object, newdata = newdata, type = "prob")[, "Success"]
 }
 
-# Compute SHAP values
 set.seed(123)
 shap_values <- fastshap::explain(
   object = rf_model,
-  X = df_for_class[, c("budget", "release_year", "runtime", "popularity")],  # Use the feature columns
+  X = df_for_class[, c("budget", "release_year", "runtime", "popularity")],  
   pred_wrapper = predict_function,
   nsim = 50,
   adjust = TRUE
 )
 
-# Mean Absolute SHAP values
 mean_abs_shap <- colMeans(abs(shap_values))
 shap_importance <- data.frame(
   Feature = names(mean_abs_shap),
@@ -1520,10 +1492,36 @@ ggplot(shap_importance, aes(x = reorder(Feature, MeanAbsShap), y = MeanAbsShap))
   theme_minimal()
 
 ```
-
+Again, this predicts the same as the other models with order of importance being popualrity, release_year, budget, runtime. 
 #### SHAP Dependence Plot
-
+Now we will plot a SHAP dependence plot for each variable to see the complete view of the model’s decision-making process.
 ```{r}
+shap_values_pop <- shap_values[, "popularity"]
+
+ggplot(data = data.frame(
+  SHAP_value = shap_values_pop,
+  Feature_value = df_for_class$popularity  
+), aes(x = Feature_value, y = SHAP_value)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "loess", se = FALSE, color = "blue") +
+  ggtitle("SHAP Dependence Plot for Popularity") +
+  xlab("Popularity") +
+  ylab("SHAP Value") +
+  theme_minimal()
+
+shap_values_yr <- shap_values[, "release_year"]
+
+ggplot(data = data.frame(
+  SHAP_value = shap_values_yr,
+  Feature_value = df_for_class$release_year  
+), aes(x = Feature_value, y = SHAP_value)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "loess", se = FALSE, color = "blue") +
+  ggtitle("SHAP Dependence Plot for Release Year") +
+  xlab("Release Year") +
+  ylab("SHAP Value") +
+  theme_minimal()
+
 shap_values_budget <- shap_values[, "budget"]
 
 ggplot(data = data.frame(
@@ -1537,23 +1535,74 @@ ggplot(data = data.frame(
   ylab("SHAP Value") +
   theme_minimal()
 
+shap_values_runtime <- shap_values[, "runtime"]
+
+ggplot(data = data.frame(
+  SHAP_value = shap_values_runtime,
+  Feature_value = df_for_class$runtime  
+), aes(x = Feature_value, y = SHAP_value)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "loess", se = FALSE, color = "blue") +
+  ggtitle("SHAP Dependence Plot for Runtime") +
+  xlab("Runtime") +
+  ylab("SHAP Value") +
+  theme_minimal()
+
+
+```
+###RFE for Feature Selection
+```{r, eval = FALSE}
+selected_features_df <- numeric_vars[, c("budget", "release_year", "runtime", "popularity")]
+
+ctrl <- rfeControl(functions = rfFuncs, method = "cv", number = 5)
+
+rfe_result <- rfe(selected_features_df, numeric_vars$success, sizes = c(1:ncol(selected_features_df)), rfeControl = ctrl)
+
+print(rfe_result)
+
+selected_features <- rfe_result$optVariables
+print(selected_features)
 
 ```
 
 ### Multiple Regression with t-values for Variable Importance
 
 ```{r}
-# View the summary of the model to check t-values and p-values
 summary(lg_model)
 
-# The t-values are listed in the "t value" column of the summary.
-# High t-values indicate important features, low t-values indicate less important features.
 ```
+We can use Pr|z| to find statistically significant features. Since release year and popularity are the variables with p values less than 0.05, we can say these are the variables that are statistically significant at predicting success.
 
--   A **higher absolute t-value** (greater than 2 or less than -2) indicates that the predictor is more significant.
+###Feature Selection with all variables in the dataset
+####Z-scores for Most Significant Variables
+```{r}
+numeric_vars <- df_for_class[, sapply(df_for_class, is.numeric)]
+numeric_vars$success <- df_for_class$success
+lg_model2 <- glm(success ~ ., data = numeric_vars, family = binomial)
+summary(lg_model2)
+```
+We can use Pr|z| to find statistically significant features. When looking at the model with every variable, the only two with p values less than 0.05 and therefore are statistically significant at predicting success are revenue and budget. However, we need to be cautious because these are correlated.
+```{r}
+step_model <- step(lg_model, direction = "both", trace = 0)
 
--   A **low t-value** (near 0) suggests that the predictor doesn't contribute much to the model and may be removed.
+summary(step_model)
 
+```
+After using the STEP model, it shows that release_year and popularity are the 2 features that were selected. 
+```{r}
+
+ctrl <- rfeControl(functions = rfFuncs, method = "cv", number = 10)
+
+rfe_result <- rfe(numeric_vars[, -which(names(numeric_vars) == "success")], numeric_vars$success, sizes = c(1:ncol(numeric_vars)-1), rfeControl = ctrl)
+
+print(rfe_result)
+
+selected_features <- rfe_result$optVariables
+print(selected_features)
+
+
+```
+This selects profit, however this is directly correlated with success so we need to be weary.
 
 ## Comparing Predictor Sets
 
