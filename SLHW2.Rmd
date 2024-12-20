@@ -21,6 +21,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # install.packages("gbm")
 # install.packages("fastshap")
 #install.packages("effects")
+#install.packages("ROCR")
 ```
 
 ```{r libraries}
@@ -393,19 +394,20 @@ ggplot(training, aes(x = success)) +
 5.  Predicting Budget using logistic regression
 6.  Predicting whether a movie was a success or not is our main objective.
 
-# Normalizing the data
+# normalizing the data
 We will normalize the data with the min-max normalization function which will later be split into training and testing and used for models that need normalized data.
 ```{r}
+# Columns to normalize
 columns_to_normalize <- c("budget", "release_year", "runtime", "popularity")
-
+# Min-max normalization function
 min_max_normalize <- function(x) {
   (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
 }
-
+# Create a copy of the original data frame
 df_normal <- df_for_class
-
+# Normalize only the specified columns
 df_normal[columns_to_normalize] <- lapply(df_for_class[columns_to_normalize], min_max_normalize)
-
+# Check the structure to confirm normalization
 str(df_normal)
 
 ```
@@ -855,13 +857,13 @@ pdp_data4_nb <- data.frame(
 
 pred_probs4_nb <- predict(nb_model, newdata = pdp_data4_nb, type = "raw")
 
-success_probability4 <- pred_probs_nb[, 2]
+success_probability4 <- pred_probs4_nb[, 2]
 
 pdp_data4_nb$success_probability4 <- success_probability4
 
 ggplot(pdp_data4_nb, aes(x = release_year, y = success_probability4)) +
   geom_line() +
-  labs(title = "Partial Dependence of Success on release year (LDA)",
+  labs(title = "Partial Dependence of Success on release year (nb)",
        x = "release year",
        y = "Probability of Success") +
   theme_minimal()
