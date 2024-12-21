@@ -1669,17 +1669,18 @@ We can see that the reduced model performs slightly better on new data.
 
 ### Comparing Models with Different Predictor Sets
 We have one example of a reduced model above. Let's continue and keep comparing different predictor sets all including popularity since this was unanimously the most influential feature predicting success. We will train and evaluate models with different predictor sets for Random Forest and train and evaluate models with different predictor sets for Multiple Linear Regression.
-
 ```{r}
+# Define predictor sets
 predictor_set_1 <- c("budget", "popularity")
 predictor_set_2 <- c("release_year", "popularity")
 predictor_set_3 <- c("budget", "release_year", "popularity")
 predictor_set_4 <- c("budget", "release_year", "runtime", "popularity")
 
+# Function to train a random forest model and compute AUC
 train_rf_model <- function(predictors, data) {
   model <- randomForest(success ~ ., data = data[, c(predictors, "success")], ntree = 500)
   prob <- predict(model, type = "prob")[,2]
-
+  
   pred <- prediction(prob, data$success)
   perf <- performance(pred, measure = "auc")
   auc <- perf@y.values[[1]]
@@ -1687,8 +1688,9 @@ train_rf_model <- function(predictors, data) {
   return(auc)
 }
 
-train_lm_model <- function(predictors, data) {
-  model <- lm(success ~ ., data = data[, c(predictors, "success")])
+# Function to train a logistic regression model and compute accuracy
+train_logit_model <- function(predictors, data) {
+  model <- glm(success ~ ., data = data[, c(predictors, "success")], family = binomial)
   
   prob <- predict(model, type = "response")
   pred_labels <- ifelse(prob > 0.5, 1, 0)
@@ -1698,6 +1700,7 @@ train_lm_model <- function(predictors, data) {
   return(accuracy)
 }
 
+# Train random forest models and compute AUC for each predictor set
 rf_auc_1 <- train_rf_model(predictor_set_1, df_for_class)
 rf_auc_2 <- train_rf_model(predictor_set_2, df_for_class)
 rf_auc_3 <- train_rf_model(predictor_set_3, df_for_class)
@@ -1706,20 +1709,22 @@ rf_auc_4 <- train_rf_model(predictor_set_4, df_for_class)
 df_for_class_lg = df_for_class
 df_for_class_lg$success <- as.numeric(as.factor(df_for_class$success)) - 1
 
-lm_accuracy_1 <- train_lm_model(predictor_set_1, df_for_class_lg)
-lm_accuracy_2 <- train_lm_model(predictor_set_2, df_for_class_lg)
-lm_accuracy_3 <- train_lm_model(predictor_set_3, df_for_class_lg)
-lm_accuracy_4 <- train_lm_model(predictor_set_4, df_for_class_lg)
+# Train logistic regression models and compute accuracy for each predictor set
+logit_accuracy_1 <- train_logit_model(predictor_set_1, df_for_class_lg)
+logit_accuracy_2 <- train_logit_model(predictor_set_2, df_for_class_lg)
+logit_accuracy_3 <- train_logit_model(predictor_set_3, df_for_class_lg)
+logit_accuracy_4 <- train_logit_model(predictor_set_4, df_for_class_lg)
 
+# Create a performance comparison table
 performance_comparison <- data.frame(
   Model = c("Random Forest (Set 1)", "Random Forest (Set 2)", "Random Forest (Set 3)", "Random Forest (Set 4)",
-            "Linear Regression (Set 1)", "Linear Regression (Set 2)", "Linear Regression (Set 3)", "Linear Regression (Set 4)"),
+            "Logistic Regression (Set 1)", "Logistic Regression (Set 2)", "Logistic Regression (Set 3)", "Logistic Regression (Set 4)"),
   AUC_or_Accuracy = c(rf_auc_1, rf_auc_2, rf_auc_3, rf_auc_4,
-                      lm_accuracy_1, lm_accuracy_2, lm_accuracy_3, lm_accuracy_4)
+                      logit_accuracy_1, logit_accuracy_2, logit_accuracy_3, logit_accuracy_4)
 )
 
+# Print the performance comparison table
 print(performance_comparison)
-
 
 ```
 
@@ -1777,5 +1782,5 @@ model3 <- glm(success ~ budget + release_year + popularity, data = df_for_class_
 effect_plot <- allEffects(model3)
 plot(effect_plot)
 ```
-
+All predictors show a somewhat linear relationship, indicating a constant rate of change in the log odds/probability of success. Budget is pretty constant, whereas release year shows a negative relationship: as the year of release increases the probability of success decreases. Popularity has a positive relationship: as popularity increases the probability of success increases. Budget has the widest confidence interval (shaded region) meaning there is greater uncertainty in the estimated effect than popularity and release year. 
 
