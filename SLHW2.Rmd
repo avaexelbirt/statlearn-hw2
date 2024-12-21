@@ -1727,6 +1727,31 @@ performance_comparison <- data.frame(
 print(performance_comparison)
 
 ```
+###AIC and BIC Calculations 
+```{r}
+compute_aic_bic <- function(predictors, data) {
+  model <- glm(success ~ ., data = data[, c(predictors, "success")], family = binomial)
+  aic <- AIC(model)
+  bic <- BIC(model)
+  return(c(AIC = aic, BIC = bic))
+}
+
+aic_bic_set_1 <- compute_aic_bic(predictor_set_1, df_for_class_lg)
+aic_bic_set_2 <- compute_aic_bic(predictor_set_2, df_for_class_lg)
+aic_bic_set_3 <- compute_aic_bic(predictor_set_3, df_for_class_lg)
+aic_bic_set_4 <- compute_aic_bic(predictor_set_4, df_for_class_lg)
+
+aic_bic_comparison <- data.frame(
+  Predictor_Set = c("Set 1", "Set 2", "Set 3", "Set 4"),
+  AIC = c(aic_bic_set_1["AIC"], aic_bic_set_2["AIC"], aic_bic_set_3["AIC"], aic_bic_set_4["AIC"]),
+  BIC = c(aic_bic_set_1["BIC"], aic_bic_set_2["BIC"], aic_bic_set_3["BIC"], aic_bic_set_4["BIC"])
+)
+
+print(aic_bic_comparison)
+
+
+```
+Based on AIC and BIC, one should choose Set 2 because it has the lowest AIC and BIC values, indicating the best balance of fit and complexity among the four models.
 
 ### Plotting Performance Comparison
 
