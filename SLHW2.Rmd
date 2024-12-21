@@ -1571,6 +1571,10 @@ ggplot(data = data.frame(
 
 
 ```
+You can see for popularity, there is a non linear relationship positive relationship between popularity and the SHAP values. Initially, popularity positively contributes to the prediction of success, but after reaching a peak SHAP value, the contribution decreases and eventually becomes negative. This suggests that higher levels of popularity initially increase the likelihood of success, but beyond a certain point, it negatively affects the prediction. The maximum SHAP value is 0.5 indicating that the strongest contribution of popularity to the model's prediction is around 50%. Because it is nonlinear is suggests that there is a non linear relationship between popularity and the predictions. Since there is not much variance in the SHAP values, it does not suggest a strong interaction effect with other variables. 
+For release year, there is almost a linear relationship between release year and the predictions with release year negatively impacting predictions. The wider spread of SHAP values indicates possible interactions with other features. The maximum SHAP value is 0.2 indicating that the strongest contribution of popularity to the model's prediction is around 20%.
+For budget, the curve starts out as negative and then flattens out in the positive direction once budget is greater than 0. This indicates that while budget is negative, it negatively affects the prediction, but once budget is positive it positively contributes to the prediction. Since it is non linear, this represents a non linear relationship between the feature and the prediction. A wide spread in the beginning indicates potential interactions with other variables. 
+For runtime, there is almost a linear relationship between runtime and the predictions with runtime positively impacting predictions. The wider spread of SHAP values indicates possible interactions with other features. The maximum SHAP value is 0.12 indicating that the strongest contribution of popularity to the model's prediction is around 12%.
 
 #### RFE for Feature Selection
 
@@ -1653,7 +1657,7 @@ cat("Base Model Accuracy: ", base_accuracy, "\n")
 
 We will now use only the most important predictors identifies through feature selection which are popularity and release year. 
 
-```{r}
+```{r warning=FALSE}
 reduced_model <- glm(success ~ release_year + popularity, data = training_lg, family = binomial)
 reduced_probs <- predict(reduced_model, newdata = testing_lg, type = "response")
 reduced_preds <- ifelse(reduced_probs > 0.5, 1, 0)
@@ -1739,8 +1743,8 @@ ggplot(performance_comparison, aes(x = Model, y = AUC_or_Accuracy, fill = Model)
 
 We can test whether interaction terms improve model performance.
 
-```{r}
-interaction_model <- glm(success ~ budget * popularity + release_year, data = df_for_class_lg, family = binomial)
+```{r warning=FALSE}
+interaction_model <- glm(success ~ budget * release_year + popularity, data = df_for_class_lg, family = binomial)
 interaction_probs <- predict(interaction_model, type = "response")
 interaction_preds <- ifelse(interaction_probs > 0.5, 1, 0)
 interaction_accuracy <- mean(interaction_preds == df_for_class_lg$success)
@@ -1752,7 +1756,7 @@ cat("Interaction Model Accuracy: ", interaction_accuracy, "\n")
 
 Use cross-validation to evaluate the generalizability of each predictor set.
 
-```{r}
+```{r warning=FALSE}
 # Base Model
 base_cv <- train(success ~ budget + release_year + runtime + popularity, data = df_for_class, method = "glm", family = binomial, trControl = trainControl(method = "cv", number = 5))
 print(base_cv)
