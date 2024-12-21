@@ -14,15 +14,15 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 # Install necessary libraries if not installed
 #install.packages(c("ggplot2", "dplyr", "scales", "lubridate"))
-install.packages("caret")
+#install.packages("caret")
 # install.packages("GGally")
 # install.packages("tidyverse")
-install.packages("randomForest")
+#install.packages("randomForest")
 # install.packages("gbm")
 # install.packages("fastshap")
 #install.packages("effects")
-install.packages("ROCR")
-install.packages("e1071")
+#install.packages("ROCR")
+#install.packages("e1071")
 ```
 
 ```{r libraries}
@@ -55,7 +55,7 @@ library(ROCR)
 #tuesdata <- tidytuesdayR::tt_load('2022-11-01')
 tuesdata <- tidytuesdayR::tt_load(2022, week = 44)
 horror <- tuesdata$horror_movies
-write.csv(horror, "horror_movies.csv", row.names = FALSE)
+#write.csv(horror, "horror_movies.csv", row.names = FALSE)
 ```
 
 ```{r glimpse}
